@@ -26,7 +26,6 @@ import argparse
 import datetime
 import re
 from pathlib import Path
-from urllib.parse import quote
 
 # First-party modules
 import data
@@ -192,7 +191,6 @@ def build_article_url(root_url, article_path):
         article_path_string = article_path_string[1:]
 
     article_url = '/'.join((root_url, article_path_string))
-    article_url = quote(article_url)
 
     return article_url
 

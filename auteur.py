@@ -68,7 +68,7 @@ def add_new_article(args):
     """
 
     # Create HTML output path from Markdown input path.
-    output_path = args.input_path.with_suffix('') / Path('index.html')
+    output_path = args.input_path.parent / Path('index.html')
 
     # Translate Markdown input into HTML.
     html = file_tools.parse_markdown_file(args.input_path)

@@ -100,17 +100,16 @@ def build_website(args):
 
     # Now iterate over each item in the listing file and regenerate the corresponding web page.
     for article in listing:
-        if article.source:
+        if article.source.suffix != '.html':
             # Try to load article contents from markdown file.
             article.html = file_tools.parse_markdown_file(article.source)
+
+            # Apply blog post template to article content.
+            article.html = generate_post(article)
 
         else:
             # A corresponding markdown file doesn't exist, so get content from HTML file instead.
             raw_html = file_tools.read_complete_file(article.html_path)
-            article.html = preprocess_raw_html(raw_html)
-
-        # Apply blog post template to article content.
-        article.html = generate_post(article)
 
         # Write blog post to filesystem, update previous post, and update listing file.
         file_tools.write_post(article)

@@ -152,15 +152,12 @@ def write_post(article, listing_path=LISTING_PATH):
     except (AttributeError, ValueError):
         # Current article not yet in listing.
         previous_article_index = len(listing) - 1
-        if previous_article_index < 0:
-            # No previous article; this one is the first.
-            previous_article_index = None
 
         # Update blog post listing to include current post.
         listing.append(article)
         write_listing_file(listing, listing_path)
 
-    if previous_article_index is not None:
+    if previous_article_index >= 0:
         # Insert `Next` link in previous article.
         previous_article = read_complete_file(listing[previous_article_index].html_path)
 

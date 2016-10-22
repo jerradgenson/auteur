@@ -15,7 +15,7 @@ from collections import namedtuple
 from pathlib import Path
 
 # First-party modules
-from file_tools import read_listing_file, read_complete_file, get_configuration
+from file_tools import read_listing_file, read_complete_file, get_configuration, find_article_index
 from data import LISTING_PATH, TEMPLATE_PATH, HOME_PAGE_LINK
 
 
@@ -216,13 +216,27 @@ def generate_landing_page(template_path=TEMPLATE_PATH):
     return landing_page_html
 
 
-def generate_post(html, output_path, template_path=TEMPLATE_PATH, listing_path=LISTING_PATH):
+def preprocess_raw_html(raw_html):
+    """
+    Perform preprocessing on raw HTML source files before calling `generate_post`.
+    """
+
+    article_content_match = re.search('<article>.+?</section>', raw_html, re.DOTALL)
+    article_content = article_content_match.group(0)
+    # Remove HTML tags at beginning and end of article content.
+    article_content = article_content.replace('<article>', '').replace('</section>', '')
+    article_content = article_content.replace('<section class="main_content">', '')
+    article_content = article_content.replace('<section class="article_content">', '')
+
+    return article_content
+
+
+def generate_post(article, template_path=TEMPLATE_PATH, listing_path=LISTING_PATH):
     """
     Apply blog post template to Markdown-to-HTML translation.
 
     Args
-      html: HTML content to turn into blog post.
-      output_path: Output path for final HTML blog post file.
+      article: An instance of file_tools.Article.
       template_path: Path to blog post template file. (Optional)
       listing_path: Path to blog post listing file. (Optional)
 
@@ -232,9 +246,9 @@ def generate_post(html, output_path, template_path=TEMPLATE_PATH, listing_path=L
     """
 
     # Find top-level heading tag in HTML and turn it into article title.
-    article_title_match = re.search('<h1>.+?</h1>', html)
+    article_title_match = re.search('<h1>.+?</h1>', article.html)
     if not article_title_match:
-        article_title_match = re.search('<h2 class="article_title">.+?</a>', html)
+        article_title_match = re.search('<h2 class="article_title">.+?</a>', article.html)
 
     if not article_title_match:
         raise ValueError('Argument `html` must have an `h1` or `h2` tag.')
@@ -246,7 +260,8 @@ def generate_post(html, output_path, template_path=TEMPLATE_PATH, listing_path=L
     article_title = article_title.replace('</a>', '')
 
     # Extract publication date if it exists.
-    pub_date_full, pub_date = extract_pub_date(html)
+    pub_date_full, pub_date = extract_pub_date(article.html)
+    article.pub_date = datetime.datetime.strptime(pub_date, '%B %d, %Y')
 
     # Apply HTML template to article title.
     article_title_html = _ARTICLE_TITLE_TEMPLATE.format(article_title=article_title,
@@ -254,7 +269,7 @@ def generate_post(html, output_path, template_path=TEMPLATE_PATH, listing_path=L
                                                         article_path='')
 
     # Remove heading from article content, then reinsert it as the article's title.
-    html = re.sub('<h2.+?</h2>', '', html)
+    html = re.sub('<h2.+?</h2>', '', article.html)
     html = html.replace(article_title_match.group(0), '')
     html = html.strip()
 
@@ -276,17 +291,25 @@ def generate_post(html, output_path, template_path=TEMPLATE_PATH, listing_path=L
 
     # Create link to previous blog entry.
     listing = read_listing_file(listing_path)
-    if output_path not in listing:
-        # If the output path for the current article isn't in the blog post listing then we know this is the most
+    try:
+        article_index = find_article_index(article, listing)
+
+    except ValueError:
+        # If the current article isn't in the blog post listing then we know this is the most
         # recent post, and the last post in the listing is what we should link to.
-        previous_article = listing[-1]
+        try:
+            previous_article = Path('../') / listing[-1].target
+
+        except IndexError:
+            # This is the first blog post; there is no previous article.
+            previous_article = ''
 
     else:
         # This isn't the most recent post, so we need to figure out which post it is so we can link it to the previous
         # article.
-        previous_article_index = listing.index(output_path) - 1
+        previous_article_index = article_index - 1
         if previous_article_index >= 0:
-            previous_article = Path('../') / listing[previous_article_index].parent
+            previous_article = Path('../') / listing[previous_article_index].target
 
         else:
             # This is the first blog post; there is no previous article!
@@ -338,4 +361,4 @@ def create_article_previews(listing_path=LISTING_PATH):
 
     # Extract the first photograph and paragraph from all articles.
     listing.reverse()
-    return (extract_article_preview(article_path) for article_path in listing)
+    return (extract_article_preview(article.html_path) for article in listing)

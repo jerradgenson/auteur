@@ -53,12 +53,15 @@ def read_listing_file(listing_path):
       listing_path: Path to the listing file as a Path object.
 
     Returns
-      A list of Path objects for blog articles in chronological order.
+      A list of Article objects for blog articles in chronological order.
 
     """
 
-    listing = read_json_file(listing_path)
-    return [Path(article_path) / Path('index.html') for article_path in listing]
+    try:
+        return [Article.from_json(listing) for listing in read_json_file(listing_path)]
+
+    except IOError:
+        return []
 
 
 def write_listing_file(listing, listing_path):
@@ -67,7 +70,7 @@ def write_listing_file(listing, listing_path):
     so the listing object can be properly serialized.
 
     Args
-      listing: A list of Path objects for blog articles in chronological order.
+      listing: A list of Article objects for blog articles in chronological order.
       listing_path: Path to the listing file as a Path object.
 
     Returns
@@ -75,7 +78,7 @@ def write_listing_file(listing, listing_path):
 
     """
 
-    listing = [str(article_path.parent) for article_path in listing]
+    listing = [article.article_dict for article in listing]
     try:
         with listing_path.open('w') as listing_file:
             json.dump(listing, listing_file)
@@ -87,7 +90,7 @@ def write_listing_file(listing, listing_path):
 
 def read_json_file(file_path):
     """
-    Write JSON file into memory. Make sure file descriptor is closed properly and provide exception handling
+    Read JSON file into memory. Make sure file descriptor is closed properly and provide exception handling
     as appropriate.
     Args
       file_path: Path to the JSON file as a Path object.
@@ -108,13 +111,29 @@ def read_json_file(file_path):
     return json_object
 
 
-def write_post(blog_post, output_path, listing_path=LISTING_PATH):
+def find_article_index(article, listing):
+    """
+    Find the index of the previous article in the article listing.
+    Return `None` if no previous article exists.
+    Raise `ValueError` if article isn't in listing.
+    """
+
+    index = 0
+    for current_article in listing:
+        if article.target == current_article.target:
+            return index
+
+        index += 1
+
+    raise ValueError('article not in listing')
+
+
+def write_post(article, listing_path=LISTING_PATH):
     """
     Write blog post to filesystem, update previous post, and update listing file.
 
     Args
-      blog_post: Final blog post HTML string.
-      output_path: Path to write blog post to as Path object.
+      article: An instance of Article.
       listing_path: Path to blog post listing file as Path object.
 
     Return
@@ -123,12 +142,12 @@ def write_post(blog_post, output_path, listing_path=LISTING_PATH):
     """
 
     # Write new blog post to filesystem.
-    write_complete_file(blog_post, output_path)
+    write_complete_file(article.html, article.html_path)
     listing = read_listing_file(listing_path)
 
     # Determine index of previous article, if one exists.
     try:
-        previous_article_index = listing.index(output_path) - 1
+        previous_article_index = find_article_index(article, listing) - 1
 
     except (AttributeError, ValueError):
         # Current article not yet in listing.
@@ -138,19 +157,19 @@ def write_post(blog_post, output_path, listing_path=LISTING_PATH):
             previous_article_index = None
 
         # Update blog post listing to include current post.
-        listing.append(output_path)
+        listing.append(article)
         write_listing_file(listing, listing_path)
 
     if previous_article_index is not None:
         # Insert `Next` link in previous article.
-        previous_article = read_complete_file(listing[previous_article_index])
+        previous_article = read_complete_file(listing[previous_article_index].html_path)
 
         # Check to see if `Next` link already exists before inserting one.
         if not re.search('<a href=".+?">Next</a>', previous_article):
             # Create link to current post from previous post.
-            next_tag_template = _NEXT_TAG_TEMPLATE.format(Path('../') / output_path.parent)
+            next_tag_template = _NEXT_TAG_TEMPLATE.format(Path('../') / article.target)
             previous_article = previous_article.replace(_NEXT_TAG_KEY, next_tag_template)
-            write_complete_file(previous_article, listing[previous_article_index])
+            write_complete_file(previous_article, listing[previous_article_index].html_path)
 
 
 def parse_markdown_file(input_path):
@@ -301,11 +320,14 @@ class Article:
     """
 
     DATE_FORMAT = '%Y%m%d%H%M'
+    HTML_FILENAME = 'index.html'
 
-    def __init__(self, source=None, target=None, pub_date=None):
+    def __init__(self, source=None, target=None, pub_date=None, html=None, markdown=None ):
         self.source = Path(source) if source else None
         self.target = Path(target) if target else None
         self.pub_date = pub_date
+        self.html = html
+        self.markdown = markdown
 
     def pub_date_today(self):
         """
@@ -319,23 +341,54 @@ class Article:
         Set `pub_date` attribute from a datestring of the format `%Y%m%d%H%M`.
         """
 
-        self.pub_date = datetime.strptime(date_string, self.DATE_FORMAT)
+        self.pub_date = self.pub_date_str_to_datetime(date_string)
 
     def str_from_pub_date(self):
         """
         Return `pub_date` attribute as a string of the format `%Y%m%d%H%M`.
         """
 
-        return pub_date.strftime(self.DATE_FORMAT)
+        return self.pub_date.strftime(self.DATE_FORMAT)
 
     @property
     def article_dict(self):
-	       """
-           A dictionary representation of the Article.
-           """
+        """
+        A dictionary representation of the Article.
+        """
 
-           pub_date_str = self.str_from_pub_date()
-           return {'source': str(self.source), 'target': str(self.target), 'pub_date': pub_date_str}
+        pub_date_str = self.str_from_pub_date()
+        source = str(self.source) if self.source else '__None__'
+        target = str(self.target) if self.target else '__None__'
+        return {'source': source, 'target': target, 'pub_date': pub_date_str}
+
+    @property
+    def html_path(self):
+        """
+        Path to the article's HTML file.
+        """
+
+        return self.target / self.HTML_FILENAME
+
+    @staticmethod
+    def date_string_to_datetime(date_string):
+        """
+        Convert a `date_string` of the format `%Y%m%d%H%M` to a `datetime` object.
+        """
+
+        return datetime.strptime(date_string, Article.DATE_FORMAT)
+
+    @staticmethod
+    def from_json(listing):
+        """
+        Create an Article object from a JSON dictionary.
+        """
+
+        source = listing['source']
+        source = None if source == '__None__' else source
+        target = listing['target']
+        target = None if target == '__None__' else target
+        pub_date = Article.date_string_to_datetime(listing['pub_date'])
+        return Article(source, target, pub_date)
 
 
 # Create 'get_configuration' function.

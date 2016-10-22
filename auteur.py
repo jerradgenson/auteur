@@ -31,7 +31,7 @@ from pathlib import Path
 import data
 import file_tools
 from data import RSS_TEMPLATE, RSS_ITEM_TEMPLATE
-from html_tools import generate_landing_page, generate_post, create_article_previews
+from html_tools import generate_landing_page, generate_post, create_article_previews, preprocess_raw_html
 
 
 def auteur():
@@ -67,17 +67,23 @@ def add_new_article(args):
 
     """
 
-    # Create HTML output path from Markdown input path.
-    output_path = args.input_path.parent / Path('index.html')
+    article = file_tools.Article()
+    article.source = args.input_path
+    article.target = article.source.parent
+    if article.source.suffix == '.html':
+        # Treat the source file as an html file.
+        raw_html = file_tools.read_complete_file(args.input_path)
+        article.html = preprocess_raw_html(raw_html)
 
-    # Translate Markdown input into HTML.
-    html = file_tools.parse_markdown_file(args.input_path)
+    else:
+        # Translate Markdown input into HTML.
+        article.html = file_tools.parse_markdown_file(article.source)
 
     # Apply blog post template to Markdown-to-HTML translation.
-    blog_post = generate_post(html, output_path)
+    article.html = generate_post(article)
 
     # Write blog post to filesystem, update previous post, and update listing file.
-    file_tools.write_post(blog_post, output_path)
+    file_tools.write_post(article)
 
 
 def build_website(args):
@@ -93,37 +99,21 @@ def build_website(args):
     listing = file_tools.read_listing_file(data.LISTING_PATH)
 
     # Now iterate over each item in the listing file and regenerate the corresponding web page.
-    for article_html_path in listing:
-        # First, try to determine if a corresponding markdown file exists.
-        # Path to use if the markdown file is in the same directory as the html file.
-        article_directory = article_html_path.parent
-        article_md_path1 = article_directory / Path(article_directory.stem).with_suffix('.md')
-
-        # Path to use if the markdown file is in the parent directory.
-        article_parent_directory = article_directory.parent
-        article_md_path2 = article_parent_directory / Path(article_directory.stem).with_suffix('.md')
-        if article_md_path1.exists():
-            # A corresponding markdown file does exist, so get article content from this.
-            article_content = file_tools.parse_markdown_file(article_md_path1)
-
-        elif article_md_path2.exists():
-            article_content = file_tools.parse_markdown_file(article_md_path2)
+    for article in listing:
+        if article.source:
+            # Try to load article contents from markdown file.
+            article.html = file_tools.parse_markdown_file(article.source)
 
         else:
             # A corresponding markdown file doesn't exist, so get content from HTML file instead.
-            full_html = file_tools.read_complete_file(article_html_path)
-            article_content_match = re.search('<article>.+?</section>', full_html, re.DOTALL)
-            article_content = article_content_match.group(0)
-            # Remove HTML tags at beginning and end of article content.
-            article_content = article_content.replace('<article>', '').replace('</section>', '')
-            article_content = article_content.replace('<section class="main_content">', '')
-            article_content = article_content.replace('<section class="article_content">', '')
+            raw_html = file_tools.read_complete_file(article.html_path)
+            article.html = preprocess_raw_html(raw_html)
 
         # Apply blog post template to article content.
-        blog_post = generate_post(article_content, article_html_path)
+        article.html = generate_post(article)
 
         # Write blog post to filesystem, update previous post, and update listing file.
-        file_tools.write_post(blog_post, article_html_path)
+        file_tools.write_post(article)
 
 
 def create_rss_feed():

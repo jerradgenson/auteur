@@ -13,6 +13,7 @@ import json
 import re
 from collections import namedtuple
 from pathlib import Path
+from datetime import datetime
 
 # Third-party modules
 import markdown
@@ -288,6 +289,53 @@ def _create_get_configuration():
         return configuration
 
     return get_configuration
+
+
+class Article:
+    """
+    Information needed to construct a blog article.
+
+    Args
+      article_dict: An article dictionary read from the listing file.
+
+    """
+
+    DATE_FORMAT = '%Y%m%d%H%M'
+
+    def __init__(self, source=None, target=None, pub_date=None):
+        self.source = Path(source) if source else None
+        self.target = Path(target) if target else None
+        self.pub_date = pub_date
+
+    def pub_date_today(self):
+        """
+        Set `pub_date` attribute for today's date.
+        """
+
+        self.pub_date = datetime.today()
+
+    def pub_date_from_str(self, date_string):
+        """
+        Set `pub_date` attribute from a datestring of the format `%Y%m%d%H%M`.
+        """
+
+        self.pub_date = datetime.strptime(date_string, self.DATE_FORMAT)
+
+    def str_from_pub_date(self):
+        """
+        Return `pub_date` attribute as a string of the format `%Y%m%d%H%M`.
+        """
+
+        return pub_date.strftime(self.DATE_FORMAT)
+
+    @property
+    def article_dict(self):
+	       """
+           A dictionary representation of the Article.
+           """
+
+           pub_date_str = self.str_from_pub_date()
+           return {'source': str(self.source), 'target': str(self.target), 'pub_date': pub_date_str}
 
 
 # Create 'get_configuration' function.

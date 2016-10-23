@@ -366,6 +366,10 @@ class Article:
 
         return self.target / self.HTML_FILENAME
 
+    @property
+    def human_readable_pub_date(self):
+        return self.pub_date.strftime('%B %d, %Y')
+
     @staticmethod
     def date_string_to_datetime(date_string):
         """

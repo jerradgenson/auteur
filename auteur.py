@@ -70,17 +70,22 @@ def add_new_article(args):
     article = file_tools.Article()
     article.source = args.input_path
     article.target = article.source.parent
+    if args.pub_date:
+        article.pub_date = datetime.datetime.strptime(args.pub_date, '%B %d, %Y')
+
+    else:
+        article.pub_date_today()
+
     if article.source.suffix == '.html':
         # Treat the source file as an html file.
-        raw_html = file_tools.read_complete_file(args.input_path)
-        article.html = preprocess_raw_html(raw_html)
+        article.html = file_tools.read_complete_file(args.input_path)
 
     else:
         # Translate Markdown input into HTML.
         article.html = file_tools.parse_markdown_file(article.source)
 
-    # Apply blog post template to Markdown-to-HTML translation.
-    article.html = generate_post(article)
+        # Apply blog post template to Markdown-to-HTML translation.
+        article.html = generate_post(article)
 
     # Write blog post to filesystem, update previous post, and update listing file.
     file_tools.write_post(article)
@@ -125,7 +130,7 @@ def create_rss_feed():
     """
 
     # Get iterable of ArticlePreview objects.
-    articles = create_article_previews()
+    article_previews = create_article_previews()
 
     # Load main RSS template.
     rss_template = file_tools.read_complete_file(RSS_TEMPLATE)
@@ -136,16 +141,15 @@ def create_rss_feed():
     configuration = file_tools.get_configuration()
 
     items = ""
-    for article in articles:
-        url = build_article_url(configuration.root_url, article.path)
-        dt_instance = datetime.datetime.strptime(article.publication_date, "%B %d, %Y")
-        creation_date = dt_instance.strftime('%a, %d %b %Y %H:%M:%S GMT')
-        text = article.text + '</p>\n'
-        if article.first_photo:
-            photo = re.sub('<figcaption>.+?</figcaption>', '', article.first_photo)
+    for article_preview in article_previews:
+        url = build_article_url(configuration.root_url, article_preview.html_path)
+        creation_date = article_preview.pub_date.strftime('%a, %d %b %Y %H:%M:%S GMT')
+        text = article_preview.intro_text + '</p>\n'
+        if article_preview.first_photo:
+            photo = re.sub('<figcaption>.+?</figcaption>', '', article_preview.first_photo)
             text = photo + '\n' + text
 
-        items += item_template.format(article_title=article.title,
+        items += item_template.format(article_title=article_preview.title,
                                       article_url=url,
                                       article_date=creation_date,
                                       article_description=text)
@@ -200,6 +204,7 @@ def parse_command_line():
 
     add_parser = subparsers.add_parser('add', help='Add an article to the blog.')
     add_parser.add_argument('input_path', help='Input Markdown file to turn into blog post.', type=Path)
+    add_parser.add_argument('--pub-date', help='Specify a publication date for this article.')
     add_parser.set_defaults(func=add_new_article)
 
     build_subparser = subparsers.add_parser('build', help='Build or rebuild the entire blog website.')

@@ -15,7 +15,7 @@ from collections import namedtuple
 from pathlib import Path
 
 # First-party modules
-from file_tools import read_listing_file, read_complete_file, get_configuration, find_article_index
+from file_tools import read_listing_file, read_complete_file, get_configuration, find_article_index, Article
 from data import LISTING_PATH, TEMPLATE_PATH, HOME_PAGE_LINK
 
 
@@ -41,21 +41,6 @@ _ARTICLE_CONTENT_TEMPLATE = '<section class="article_content">\n{article_content
 _NAV_BAR_TEMPLATE = '<a href="{previous_article}">Previous</a> <a href="../">Home</a>'
 
 
-ArticlePreview = namedtuple('ArticlePreview', ['title', 'publication_date', 'path', 'text', 'first_photo'])
-ArticlePreview.__doc__ = \
-"""
-Represents an article preview for use on blog landing page.
-
-Args
-  title: The title of the blog article.
-  publication_date: Date of article publication.
-  path: Path object for the article file.
-  text: Some introductory text from the article.
-  first_photo: HTML for the article's first photograph, if any. If photo doesn't exist, this will be `None`.
-
-"""
-
-
 def extract_pub_date(html):
     """
     Extract publication date from HTML tag.
@@ -63,50 +48,34 @@ def extract_pub_date(html):
     Args
       html: HTML string to extract publication date from.
 
-    Returns,
-      A tuple of (publication date w/ tags, publication date w/o tags)
+    Return
+      Publication date with HTML tag.
 
     """
 
     # Extract publication date.
     pub_date_match = re.search('<Published\s*=\s*.+?>', html)
     if pub_date_match:
-        # Extract actual date from pub date tag.
-        pub_date = re.sub('<Published\s*=\s*', '', pub_date_match.group(0))
-        pub_date = pub_date[:-1]
-        return pub_date_match.group(0), pub_date
-
-     # Extract date from HTML subtitle tag.
-    pub_date_match = re.search('<p class="article_subtitle">.+?</p>', html)
-    if pub_date_match:
-       pub_date = pub_date_match.group(0).replace('<p class="article_subtitle">', '').replace('</p>', '')
-       return pub_date_match.group(0), pub_date
-
-    else:
-        # No pub date tag found.
-        return None, ''
+        return pub_date_match.group(0)
 
 
-def extract_article_preview(article_path):
+def extract_article_preview(article):
     """
     Extract title, first photograph, and first paragraph from the target article.
 
     Args
-      article_path: Path object for the article file.
+      article: An instance of `file_tools.Article`.
 
     Return
-      An instance of `Article`.
+      An instance of `ArticlePreview`.
 
-      """
+    """
 
-    article_text = read_complete_file(article_path)
+    article_text = read_complete_file(article.html_path)
 
     # Extract article title.
     match = re.search('<title>.+</title>', article_text)
     article_title = match.group(0)[_ARTICLE_TITLE_START:_ARTICLE_TITLE_END]
-
-    # Extract publication date.
-    pub_date = extract_pub_date(article_text)[1]
 
     # Extract introductory text..
     paragraphs = article_text.split('<p>')
@@ -134,7 +103,7 @@ def extract_article_preview(article_path):
     else:
         first_photo = None
 
-    article_preview = ArticlePreview(article_title, pub_date, article_path, intro_text, first_photo)
+    article_preview = ArticlePreview(article, article_title, intro_text, first_photo)
 
     return article_preview
 
@@ -152,8 +121,8 @@ def generate_preview_html(article_preview):
     """
 
     article_title_html = _ARTICLE_TITLE_TEMPLATE.format(article_title=article_preview.title,
-                                                        article_subtitle=article_preview.publication_date,
-                                                        article_path=article_preview.path.parent)
+                                                        article_subtitle=article_preview.human_readable_pub_date,
+                                                        article_path=article_preview.target)
 
     if article_preview.first_photo:
         article_photo_html = article_preview.first_photo
@@ -161,8 +130,8 @@ def generate_preview_html(article_preview):
     else:
         article_photo_html = ''
 
-    continue_reading_link = _CONTINUE_READING_TEMPLATE.format(article_path=article_preview.path.parent)
-    article_content = article_preview.text + ' ' + continue_reading_link + '</p>'
+    continue_reading_link = _CONTINUE_READING_TEMPLATE.format(article_path=article_preview.target)
+    article_content = article_preview.intro_text + ' ' + continue_reading_link + '</p>'
     preview_html = _ARTICLE_PREVIEW_TEMPLATE.format(article_title=article_title_html,
                                                     article_photo=article_photo_html,
                                                     article_content=article_content)
@@ -260,12 +229,11 @@ def generate_post(article, template_path=TEMPLATE_PATH, listing_path=LISTING_PAT
     article_title = article_title.replace('</a>', '')
 
     # Extract publication date if it exists.
-    pub_date_full, pub_date = extract_pub_date(article.html)
-    article.pub_date = datetime.datetime.strptime(pub_date, '%B %d, %Y')
+    pub_date_full = extract_pub_date(article.html)
 
     # Apply HTML template to article title.
     article_title_html = _ARTICLE_TITLE_TEMPLATE.format(article_title=article_title,
-                                                        article_subtitle=pub_date,
+                                                        article_subtitle=article.human_readable_pub_date,
                                                         article_path='')
 
     # Remove heading from article content, then reinsert it as the article's title.
@@ -361,4 +329,23 @@ def create_article_previews(listing_path=LISTING_PATH):
 
     # Extract the first photograph and paragraph from all articles.
     listing.reverse()
-    return (extract_article_preview(article.html_path) for article in listing)
+    return (extract_article_preview(article) for article in listing)
+
+
+class ArticlePreview(Article):
+    """
+    Represents an article preview for use on blog landing page.
+
+    Args
+      article: An instance of `file_tools.Article`.
+      title: The title of the blog article.
+      intro_text: Some introductory text from the article.
+      first_photo: HTML for the article's first photograph, if any. If photo doesn't exist, this will be `None`.
+
+    """
+
+    def __init__(self, article, title, intro_text, first_photo):
+        self.title = title
+        self.intro_text = intro_text
+        self.first_photo = first_photo
+        super().__init__(article.source, article.target, article.pub_date, article.html, article.markdown)

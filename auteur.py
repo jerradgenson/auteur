@@ -105,7 +105,7 @@ def remove_article(args):
 
     listing = file_tools.read_listing_file(data.LISTING_PATH)
     try:
-        article_index = file_tools.find_article_index(args, listing)
+        article_index = file_tools.find_article_index(args, listing, True)
 
     except ValueError:
         raise ValueError('Article not found. Can not remove.')
@@ -232,7 +232,7 @@ def parse_command_line():
     add_parser.set_defaults(func=add_new_article)
 
     remove_parser = subparsers.add_parser('remove', help='Remove an article from the blog.')
-    remove_parser.add_argument('target', help='Article output directory.')
+    remove_parser.add_argument('title', help='Title of the article to remove.')
     remove_parser.set_defaults(func=remove_article)
 
     build_subparser = subparsers.add_parser('build', help='Build or rebuild the entire blog website.')

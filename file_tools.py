@@ -111,16 +111,28 @@ def read_json_file(file_path):
     return json_object
 
 
-def find_article_index(article, listing):
+def find_article_index(article, listing, title=False):
     """
     Find the index of the previous article in the article listing.
-    Return `None` if no previous article exists.
-    Raise `ValueError` if article isn't in listing.
+
+    Args
+       article: An instance of `Article`.
+       listing: A blog post listing.
+       title: Optional. Set to `True` to search by `title` instead of `target`.
+
+    Return
+      `None` if no previous article exists.
+
+    Raise
+      `ValueError` if article isn't in listing.
     """
 
     index = 0
     for current_article in listing:
-        if article.target == current_article.target:
+        if title and article.title == current_article.title:
+            return index
+
+        if not title and article.target == current_article.target:
             return index
 
         index += 1

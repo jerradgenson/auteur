@@ -319,12 +319,13 @@ class Article:
     DATE_FORMAT = '%Y%m%d%H%M'
     HTML_FILENAME = 'index.html'
 
-    def __init__(self, source=None, target=None, pub_date=None, html=None, markdown=None ):
+    def __init__(self, source=None, target=None, pub_date=None, html=None, markdown=None , title=None):
         self.source = Path(source) if source else None
         self.target = Path(target) if target else None
         self.pub_date = pub_date
         self.html = html
         self.markdown = markdown
+        self.title = title
 
     def pub_date_today(self):
         """
@@ -356,7 +357,8 @@ class Article:
         pub_date_str = self.str_from_pub_date()
         source = str(self.source) if self.source else '__None__'
         target = str(self.target) if self.target else '__None__'
-        return {'source': source, 'target': target, 'pub_date': pub_date_str}
+        title = self.title if self.title else '__None__'
+        return {'source': source, 'target': target, 'pub_date': pub_date_str, 'title': title}
 
     @property
     def html_path(self):
@@ -389,7 +391,8 @@ class Article:
         target = listing['target']
         target = None if target == '__None__' else target
         pub_date = Article.date_string_to_datetime(listing['pub_date'])
-        return Article(source, target, pub_date)
+        title = listing['title']
+        return Article(source, target, pub_date, title=title)
 
 
 # Create 'get_configuration' function.

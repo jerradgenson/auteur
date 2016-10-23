@@ -227,6 +227,7 @@ def generate_post(article, template_path=TEMPLATE_PATH, listing_path=LISTING_PAT
     article_title = article_title.replace('<h2 class="article_title">', '')
     article_title = re.sub('<a href=".+?">', '', article_title)
     article_title = article_title.replace('</a>', '')
+    article.title = article_title
 
     # Extract publication date if it exists.
     pub_date_full = extract_pub_date(article.html)

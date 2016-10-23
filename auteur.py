@@ -91,6 +91,30 @@ def add_new_article(args):
     file_tools.write_post(article)
 
 
+def remove_article(args):
+    """
+    Remove article from website.
+
+    Args
+      args A Namespace object with arguments from the command line.
+
+    Returns
+      None
+
+    """
+
+    listing = file_tools.read_listing_file(data.LISTING_PATH)
+    try:
+        article_index = file_tools.find_article_index(args, listing)
+
+    except ValueError:
+        raise ValueError('Article not found. Can not remove.')
+
+    listing.pop(article_index)
+    file_tools.write_listing_file(listing, data.LISTING_PATH)
+    build_website(args)
+
+
 def build_website(args):
     """
     Recreate all articles in website.
@@ -206,6 +230,10 @@ def parse_command_line():
     add_parser.add_argument('input_path', help='Input Markdown file to turn into blog post.', type=Path)
     add_parser.add_argument('--pub-date', help='Specify a publication date for this article.')
     add_parser.set_defaults(func=add_new_article)
+
+    remove_parser = subparsers.add_parser('remove', help='Remove an article from the blog.')
+    remove_parser.add_argument('target', help='Article output directory.')
+    remove_parser.set_defaults(func=remove_article)
 
     build_subparser = subparsers.add_parser('build', help='Build or rebuild the entire blog website.')
     build_subparser.set_defaults(func=build_website)

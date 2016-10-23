@@ -73,10 +73,6 @@ def extract_article_preview(article):
 
     article_text = read_complete_file(article.html_path)
 
-    # Extract article title.
-    match = re.search('<title>.+</title>', article_text)
-    article_title = match.group(0)[_ARTICLE_TITLE_START:_ARTICLE_TITLE_END]
-
     # Extract introductory text..
     paragraphs = article_text.split('<p>')
     intro_text_list = ['']
@@ -103,7 +99,7 @@ def extract_article_preview(article):
     else:
         first_photo = None
 
-    article_preview = ArticlePreview(article, article_title, intro_text, first_photo)
+    article_preview = ArticlePreview(article, intro_text, first_photo)
 
     return article_preview
 
@@ -345,8 +341,8 @@ class ArticlePreview(Article):
 
     """
 
-    def __init__(self, article, title, intro_text, first_photo):
-        self.title = title
+    def __init__(self, article, intro_text, first_photo):
         self.intro_text = intro_text
         self.first_photo = first_photo
-        super().__init__(article.source, article.target, article.pub_date, article.html, article.markdown)
+        super().__init__(article.source, article.target, article.pub_date, article.html, article.markdown,
+                         article.title)

@@ -28,10 +28,9 @@ import re
 from pathlib import Path
 
 # First-party modules
-import data
 import file_tools
 from data import RSS_TEMPLATE, RSS_ITEM_TEMPLATE
-from html_tools import generate_landing_page, generate_post, create_article_previews, preprocess_raw_html
+from html_tools import generate_landing_page, generate_post, create_article_previews
 
 
 def auteur():
@@ -76,6 +75,8 @@ def add_new_article(args):
     else:
         article.pub_date_today()
 
+    article_database = file_tools.get_article_database()
+    article_database.insert(article)
     if article.source.suffix == '.html':
         # Treat the source file as an html file.
         article.html = file_tools.read_complete_file(args.input_path)
@@ -87,8 +88,9 @@ def add_new_article(args):
         # Apply blog post template to Markdown-to-HTML translation.
         article.html = generate_post(article)
 
-    # Write blog post to filesystem, update previous post, and update listing file.
+    # Write blog post to filesystem, update previous post.
     file_tools.write_post(article)
+    article_database.commit()
 
 
 def remove_article(args):
@@ -103,15 +105,9 @@ def remove_article(args):
 
     """
 
-    listing = file_tools.read_listing_file(data.LISTING_PATH)
-    try:
-        article_index = file_tools.find_article_index(args, listing, True)
-
-    except ValueError:
-        raise ValueError('Article not found. Can not remove.')
-
-    listing.pop(article_index)
-    file_tools.write_listing_file(listing, data.LISTING_PATH)
+    article_database = file_tools.get_article_database()
+    article_database.remove(args)
+    article_database.commit()
     build_website(args)
 
 
@@ -124,11 +120,10 @@ def build_website(args):
 
     """
 
-    # First, load the listing file.
-    listing = file_tools.read_listing_file(data.LISTING_PATH)
+    article_database = file_tools.get_article_database()
 
-    # Now iterate over each item in the listing file and regenerate the corresponding web page.
-    for article in listing:
+    # Now iterate over each article in the database and regenerate the corresponding web page.
+    for article in article_database:
         if article.source.suffix != '.html':
             # Try to load article contents from markdown file.
             article.html = file_tools.parse_markdown_file(article.source)
@@ -138,9 +133,9 @@ def build_website(args):
 
         else:
             # A corresponding markdown file doesn't exist, so get content from HTML file instead.
-            raw_html = file_tools.read_complete_file(article.html_path)
+            article.html = file_tools.read_complete_file(article.html_path)
 
-        # Write blog post to filesystem, update previous post, and update listing file.
+        # Write blog post to filesystem and update previous post.
         file_tools.write_post(article)
 
 

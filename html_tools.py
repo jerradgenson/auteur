@@ -15,8 +15,9 @@ from collections import namedtuple
 from pathlib import Path
 
 # First-party modules
-from file_tools import read_listing_file, read_complete_file, get_configuration, find_article_index, Article
-from data import LISTING_PATH, TEMPLATE_PATH, HOME_PAGE_LINK
+import file_tools
+from file_tools import read_complete_file, get_configuration, Article
+from data import TEMPLATE_PATH
 
 
 # String index that article title starts on (excluding HTML tags).
@@ -196,14 +197,13 @@ def preprocess_raw_html(raw_html):
     return article_content
 
 
-def generate_post(article, template_path=TEMPLATE_PATH, listing_path=LISTING_PATH):
+def generate_post(article, template_path=TEMPLATE_PATH):
     """
     Apply blog post template to Markdown-to-HTML translation.
 
     Args
       article: An instance of file_tools.Article.
       template_path: Path to blog post template file. (Optional)
-      listing_path: Path to blog post listing file. (Optional)
 
     Return
       Final blog post HTML string.
@@ -255,36 +255,19 @@ def generate_post(article, template_path=TEMPLATE_PATH, listing_path=LISTING_PAT
     article_content_html = _ARTICLE_CONTENT_TEMPLATE.format(article_content=article_content)
 
     # Create link to previous blog entry.
-    listing = read_listing_file(listing_path)
-    try:
-        article_index = find_article_index(article, listing)
-
-    except ValueError:
-        # If the current article isn't in the blog post listing then we know this is the most
-        # recent post, and the last post in the listing is what we should link to.
-        try:
-            previous_article = Path('../') / listing[-1].target
-
-        except IndexError:
-            # This is the first blog post; there is no previous article.
-            previous_article = ''
+    previous_article = article.previous()
+    if previous_article:
+        previous_article_link = Path('../') / previous_article.target
 
     else:
-        # This isn't the most recent post, so we need to figure out which post it is so we can link it to the previous
-        # article.
-        previous_article_index = article_index - 1
-        if previous_article_index >= 0:
-            previous_article = Path('../') / listing[previous_article_index].target
-
-        else:
-            # This is the first blog post; there is no previous article!
-            previous_article = ''
+        # This is the first blog post; there is no previous article.
+        previous_article_link = ''
 
     # Now apply blog post template to article content.
     template = read_complete_file(template_path)
 
     # Insert link to previous article in nav bar template.
-    nav_bar = _NAV_BAR_TEMPLATE.format(previous_article=previous_article)
+    nav_bar = _NAV_BAR_TEMPLATE.format(previous_article=previous_article_link)
     if not previous_article:
         # No previous articles exist, so remove the `Previous` link from navigation bar.
         nav_bar = nav_bar.replace('<a href="">Previous</a>', '')
@@ -310,23 +293,19 @@ def generate_post(article, template_path=TEMPLATE_PATH, listing_path=LISTING_PAT
     return blog_post
 
 
-def create_article_previews(listing_path=LISTING_PATH):
+def create_article_previews():
     """
     Create ArticlePreview objects for all blog artiles in the listing file.
-
-    Args
-      listing_path: Location of the listing file.
 
     Return
       A generator that yeilds ArticlePreview objects.
 
     """
 
-    listing = read_listing_file(listing_path)
-
-    # Extract the first photograph and paragraph from all articles.
-    listing.reverse()
-    return (extract_article_preview(article) for article in listing)
+    article_database = file_tools.get_article_database()
+    articles = list(article_database)
+    articles.reverse()
+    return (extract_article_preview(article) for article in articles)
 
 
 class ArticlePreview(Article):

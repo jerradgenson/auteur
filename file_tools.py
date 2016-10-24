@@ -19,7 +19,7 @@ from datetime import datetime
 import markdown
 
 # First-party modules
-from data import LISTING_PATH, CONFIG_FILE_PATH, PROGRAM_NAME
+from data import CONFIG_FILE_PATH, PROGRAM_NAME
 
 
 # String "key" used to find the location to insert the `Next` tag in blog posts.
@@ -42,50 +42,6 @@ _CONFIGURATION_FILE_FIELDS = {'rss_feed_path': Path,
 
 
 Configuration = namedtuple('Configuration', ['program_name'] + list(_CONFIGURATION_FILE_FIELDS))
-
-
-def read_listing_file(listing_path):
-    """
-    Read listing file contents into memory. This function should be called instead of reading the listing file directly
-    so the file contents can be converted to a higher-order object.
-
-    Args
-      listing_path: Path to the listing file as a Path object.
-
-    Returns
-      A list of Article objects for blog articles in chronological order.
-
-    """
-
-    try:
-        return [Article.from_json(listing) for listing in read_json_file(listing_path)]
-
-    except IOError:
-        return []
-
-
-def write_listing_file(listing, listing_path):
-    """
-    Write article listing to filesystem. This function should be called instead of writing the listing file directly
-    so the listing object can be properly serialized.
-
-    Args
-      listing: A list of Article objects for blog articles in chronological order.
-      listing_path: Path to the listing file as a Path object.
-
-    Returns
-      None
-
-    """
-
-    listing = [article.article_dict for article in listing]
-    try:
-        with listing_path.open('w') as listing_file:
-            json.dump(listing, listing_file)
-
-    except IOError:
-        msg = _FILE_ERROR.format(listing_path)
-        raise IOError(msg)
 
 
 def read_json_file(file_path):
@@ -111,42 +67,12 @@ def read_json_file(file_path):
     return json_object
 
 
-def find_article_index(article, listing, title=False):
-    """
-    Find the index of the previous article in the article listing.
-
-    Args
-       article: An instance of `Article`.
-       listing: A blog post listing.
-       title: Optional. Set to `True` to search by `title` instead of `target`.
-
-    Return
-      `None` if no previous article exists.
-
-    Raise
-      `ValueError` if article isn't in listing.
-    """
-
-    index = 0
-    for current_article in listing:
-        if title and article.title == current_article.title:
-            return index
-
-        if not title and article.target == current_article.target:
-            return index
-
-        index += 1
-
-    raise ValueError('article not in listing')
-
-
-def write_post(article, listing_path=LISTING_PATH):
+def write_post(article):
     """
     Write blog post to filesystem, update previous post, and update listing file.
 
     Args
       article: An instance of Article.
-      listing_path: Path to blog post listing file as Path object.
 
     Return
       None
@@ -155,30 +81,25 @@ def write_post(article, listing_path=LISTING_PATH):
 
     # Write new blog post to filesystem.
     write_complete_file(article.html, article.html_path)
-    listing = read_listing_file(listing_path)
-
-    # Determine index of previous article, if one exists.
     try:
-        previous_article_index = find_article_index(article, listing) - 1
+        previous_article = article.previous()
 
-    except (AttributeError, ValueError):
-        # Current article not yet in listing.
-        previous_article_index = len(listing) - 1
+    except AttributeError:
+        article_database = get_article_database()
+        article_database.insert(article)
+        article_database.commit()
+        previous_article = article.previous()
 
-        # Update blog post listing to include current post.
-        listing.append(article)
-        write_listing_file(listing, listing_path)
-
-    if previous_article_index >= 0:
+    if previous_article:
         # Insert `Next` link in previous article.
-        previous_article = read_complete_file(listing[previous_article_index].html_path)
+        previous_article_text = read_complete_file(previous_article.html_path)
 
         # Check to see if `Next` link already exists before inserting one.
-        if not re.search('<a href=".+?">Next</a>', previous_article):
+        if not re.search('<a href=".+?">Next</a>', previous_article_text):
             # Create link to current post from previous post.
             next_tag_template = _NEXT_TAG_TEMPLATE.format(Path('../') / article.target)
-            previous_article = previous_article.replace(_NEXT_TAG_KEY, next_tag_template)
-            write_complete_file(previous_article, listing[previous_article_index].html_path)
+            previous_article_text = previous_article_text.replace(_NEXT_TAG_KEY, next_tag_template)
+            write_complete_file(previous_article_text, previous_article.html_path)
 
 
 def parse_markdown_file(input_path):
@@ -300,10 +221,6 @@ def _create_get_configuration():
                     msg = "Value for '{}' in configuration file has invalid type.".format(field_name)
                     raise ValueError(msg)
 
-            # Build fully-qualified path to style sheet.
-            root_url = config_values['root_url']
-            style_sheet = config_values['style_sheet']
-
             # Ensure constructed URL is joined with correct number of slashes.
             if config_values['root_url'][-1] != '/':
                 config_values['root_url'] += '/'
@@ -317,6 +234,19 @@ def _create_get_configuration():
         return configuration
 
     return get_configuration
+
+
+def _create_get_article_database():
+    articles = []
+    def get_article_database():
+        """
+        Return an instance of `_ArticleDatabase`.
+        WARNING: This class utilizes a global variable that is not thread or concurrency-safe.
+        """
+
+        return _ArticleDatabase(articles)
+
+    return get_article_database
 
 
 class Article:
@@ -338,6 +268,7 @@ class Article:
         self.html = html
         self.markdown = markdown
         self.title = title
+        self.__article_database = None
 
     def pub_date_today(self):
         """
@@ -359,6 +290,28 @@ class Article:
         """
 
         return self.pub_date.strftime(self.DATE_FORMAT)
+
+    def register(self, article_datase):
+        """
+        Register this article with an article database.
+        """
+
+        self.__article_database = article_datase
+
+    def previous(self):
+        """
+        Return previous article in article database.
+        """
+
+        if not self.__article_database:
+            raise AttributeError('Article not registered with database.')
+
+        previous_article = None
+        for article in self.__article_database:
+            if article.title == self.title:
+                return previous_article
+
+            previous_article = article
 
     @property
     def article_dict(self):
@@ -392,53 +345,52 @@ class Article:
 
         return datetime.strptime(date_string, Article.DATE_FORMAT)
 
-    @staticmethod
-    def from_json(listing):
-        """
-        Create an Article object from a JSON dictionary.
-        """
 
-        source = listing['source']
-        source = None if source == '__None__' else source
-        target = listing['target']
-        target = None if target == '__None__' else target
-        pub_date = Article.date_string_to_datetime(listing['pub_date'])
-        title = listing['title']
-        return Article(source, target, pub_date, title=title)
-
-
-class ArticleDatabase:
+class _ArticleDatabase:
     """
     Interface for article database.
-    WARNING: This class utilizes a global variable that is not thread or concurrency-safe.
     """
 
-    __articles = []
+    DATABASE_PATH = Path('.auteur/listing.json')
 
-    def __init__(self):
-        if not self.__articles:
+    def __init__(self, articles):
+        if not articles:
             try:
-                self.__articles = [Article.from_json(listing) for listing in read_json_file(LISTING_PATH)]
+                self.articles = []
+                for article_json in read_json_file(self.DATABASE_PATH):
+                    article = Article()
+                    source = article_json['source']
+                    source = None if source == '__None__' else source
+                    target = article_json['target']
+                    target = None if target == '__None__' else target
+                    pub_date = Article.date_string_to_datetime(article_json['pub_date'])
+                    title = article_json['title']
+                    article = Article(source, target, pub_date, title=title)
+                    article.register(self)
+                    self.articles.append(article)
 
             except IOError:
-                # Article database does not exist. That's fine: we can create it.
+                # Article database does not exist. That's fine; we can create it.
                 pass
 
+        else:
+            self.articles = articles
+
     def __iter__(self):
-        return iter(self.__articles)
+        return iter(self.articles)
 
     def commit(self):
         """
         Commit any unsaved changes to the database.
         """
 
-        articles_json = [article.article_dict for article in self.__articles]
+        articles_json = [article.article_dict for article in self.articles]
         try:
-            with LISTING_PATH.open('w') as listing_file:
+            with self.DATABASE_PATH.open('w') as listing_file:
                 json.dump(articles_json, listing_file)
 
         except IOError:
-            msg = _FILE_ERROR.format(LISTING_PATH)
+            msg = _FILE_ERROR.format(self.DATABASE_PATH)
             raise IOError(msg)
 
     def insert(self, article):
@@ -446,12 +398,13 @@ class ArticleDatabase:
         Insert `article` into the database.
         """
 
-        for index, other_article in enumerate(self.__articles):
+        article.register(self)
+        for index, other_article in enumerate(self.articles):
             if article.pub_date < other_article.pub_date:
-                self.__articles.insert(index)
+                self.articles.insert(index, article)
                 return
 
-        self.__articles.append(article)
+        self.articles.append(article)
 
     def remove(self, article):
         """
@@ -467,7 +420,7 @@ class ArticleDatabase:
         except ValueError:
             raise ValueError('Article not found. Can not remove.')
 
-        self.__articles.pop(article_index)
+        self.articles.pop(article_index)
 
     def find_article_index(self, article, title=False):
         """
@@ -485,7 +438,7 @@ class ArticleDatabase:
 
         """
 
-        for index, current_article in enumerate(self.__articles):
+        for index, current_article in enumerate(self.articles):
             if title and article.title == current_article.title:
                 return index
 
@@ -495,5 +448,6 @@ class ArticleDatabase:
         raise ValueError('article not in listing')
 
 
-# Create 'get_configuration' function.
+# Create 'get_configuration' and `get_article_database` functions.
 get_configuration = _create_get_configuration()
+get_article_database = _create_get_article_database()

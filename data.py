@@ -12,10 +12,6 @@ Copyright 2016 Jerrad Michael Genson
 from pathlib import Path
 
 
-# Location of blog post listing file. This file contains a list of all blog post HTML files in the order that they
-# appear in Recursive Descent.
-LISTING_PATH = Path('.auteur/listing.json')
-
 # Path to the configuration file.
 CONFIG_FILE_PATH = Path('.auteur/config.json')
 

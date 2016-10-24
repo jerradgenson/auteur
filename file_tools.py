@@ -407,5 +407,93 @@ class Article:
         return Article(source, target, pub_date, title=title)
 
 
+class ArticleDatabase:
+    """
+    Interface for article database.
+    WARNING: This class utilizes a global variable that is not thread or concurrency-safe.
+    """
+
+    __articles = []
+
+    def __init__(self):
+        if not self.__articles:
+            try:
+                self.__articles = [Article.from_json(listing) for listing in read_json_file(LISTING_PATH)]
+
+            except IOError:
+                # Article database does not exist. That's fine: we can create it.
+                pass
+
+    def __iter__(self):
+        return iter(self.__articles)
+
+    def commit(self):
+        """
+        Commit any unsaved changes to the database.
+        """
+
+        articles_json = [article.article_dict for article in self.__articles]
+        try:
+            with LISTING_PATH.open('w') as listing_file:
+                json.dump(articles_json, listing_file)
+
+        except IOError:
+            msg = _FILE_ERROR.format(LISTING_PATH)
+            raise IOError(msg)
+
+    def insert(self, article):
+        """
+        Insert `article` into the database.
+        """
+
+        for index, other_article in enumerate(self.__articles):
+            if article.pub_date < other_article.pub_date:
+                self.__articles.insert(index)
+                return
+
+        self.__articles.append(article)
+
+    def remove(self, article):
+        """
+        Remove `article` from the database.
+
+        Raises
+          `ValueError` if article not in database.
+        """
+
+        try:
+            article_index = self.find_article_index(article, True)
+
+        except ValueError:
+            raise ValueError('Article not found. Can not remove.')
+
+        self.__articles.pop(article_index)
+
+    def find_article_index(self, article, title=False):
+        """
+        Find the index of the previous article in the article database.
+
+        Args
+          article: An instance of `Article`.
+          title: Optional. Set to `True` to search by `title` instead of `target`.
+
+        Return
+          `None` if no previous article exists.
+
+        Raise
+          `ValueError` if article isn't in listing.
+
+        """
+
+        for index, current_article in enumerate(self.__articles):
+            if title and article.title == current_article.title:
+                return index
+
+            if not title and article.target == current_article.target:
+                return index
+
+        raise ValueError('article not in listing')
+
+
 # Create 'get_configuration' function.
 get_configuration = _create_get_configuration()

@@ -22,6 +22,9 @@ import markdown
 from data import CONFIG_FILE_PATH, PROGRAM_NAME
 
 
+# re pattern to match `Next` link.
+_NEXT_PATTERN = 'Home</a> <a href=".*?">Next</a>'
+
 # String "key" used to find the location to insert the `Next` tag in blog posts.
 _NEXT_TAG_KEY = 'Home</a>'
 
@@ -93,13 +96,15 @@ def write_post(article):
     if previous_article:
         # Insert `Next` link in previous article.
         previous_article_text = read_complete_file(previous_article.html_path)
+        next_tag_template = _NEXT_TAG_TEMPLATE.format(Path('../') / article.target)
+        match = re.search(_NEXT_PATTERN, previous_article_text)
+        if match:
+            previous_article_text = previous_article_text.replace(match.group(0), next_tag_template)
 
-        # Check to see if `Next` link already exists before inserting one.
-        if not re.search('<a href=".+?">Next</a>', previous_article_text):
-            # Create link to current post from previous post.
-            next_tag_template = _NEXT_TAG_TEMPLATE.format(Path('../') / article.target)
+        else:
             previous_article_text = previous_article_text.replace(_NEXT_TAG_KEY, next_tag_template)
-            write_complete_file(previous_article_text, previous_article.html_path)
+
+        write_complete_file(previous_article_text, previous_article.html_path)
 
 
 def parse_markdown_file(input_path):
@@ -358,7 +363,6 @@ class _ArticleDatabase:
             try:
                 self.articles = []
                 for article_json in read_json_file(self.DATABASE_PATH):
-                    article = Article()
                     source = article_json['source']
                     source = None if source == '__None__' else source
                     target = article_json['target']

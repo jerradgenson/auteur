@@ -47,6 +47,23 @@ _CONFIGURATION_FILE_FIELDS = {'rss_feed_path': Path,
 Configuration = namedtuple('Configuration', ['program_name'] + list(_CONFIGURATION_FILE_FIELDS))
 
 
+def insert_next_link(target_article, next_article):
+    """
+    Insert a `Next` link to `next_article` in `target_article`.
+    """
+
+    if not target_article.html:
+        target_article.html = read_complete_file(target_article.html_path)
+
+    next_tag_template = _NEXT_TAG_TEMPLATE.format(Path('../') / next_article.target)
+    match = re.search(_NEXT_PATTERN, target_article.html)
+    if match:
+        target_article.html = target_article.html.replace(match.group(0), next_tag_template)
+
+    else:
+        target_article.html = target_article.html.replace(_NEXT_TAG_KEY, next_tag_template)
+
+
 def read_json_file(file_path):
     """
     Read JSON file into memory. Make sure file descriptor is closed properly and provide exception handling
@@ -95,16 +112,8 @@ def write_post(article):
 
     if previous_article:
         # Insert `Next` link in previous article.
-        previous_article_text = read_complete_file(previous_article.html_path)
-        next_tag_template = _NEXT_TAG_TEMPLATE.format(Path('../') / article.target)
-        match = re.search(_NEXT_PATTERN, previous_article_text)
-        if match:
-            previous_article_text = previous_article_text.replace(match.group(0), next_tag_template)
-
-        else:
-            previous_article_text = previous_article_text.replace(_NEXT_TAG_KEY, next_tag_template)
-
-        write_complete_file(previous_article_text, previous_article.html_path)
+        insert_next_link(previous_article, article)
+        write_complete_file(previous_article.html, previous_article.html_path)
 
 
 def parse_markdown_file(input_path):
@@ -317,6 +326,22 @@ class Article:
                 return previous_article
 
             previous_article = article
+
+    def next(self):
+        """
+        Return next article in article database.
+        """
+
+        if not self.__article_database:
+            raise AttributeError('Article not registered with database.')
+
+        found = False
+        for article in self.__article_database:
+            if article.title == self.title:
+                found = True
+
+            elif found:
+                return article
 
     @property
     def article_dict(self):

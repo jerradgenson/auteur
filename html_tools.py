@@ -290,7 +290,13 @@ def generate_post(article, template_path=TEMPLATE_PATH):
                                 root_url=configuration.root_url,
                                 home_page_link='../')
 
-    return blog_post
+    # Create link to next blog entry.
+    article.html = blog_post
+    next_article = article.next()
+    if next_article:
+        file_tools.insert_next_link(article, next_article)
+
+    return article.html
 
 
 def create_article_previews():

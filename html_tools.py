@@ -177,7 +177,8 @@ def generate_landing_page(template_path=TEMPLATE_PATH):
                                                 rss_feed_path=configuration.rss_feed_path,
                                                 style_sheet=configuration.style_sheet,
                                                 root_url=configuration.root_url,
-                                                home_page_link='')
+                                                home_page_link='',
+                                                description=configuration.description)
 
     return landing_page_html
 
@@ -276,6 +277,7 @@ def generate_post(article, template_path=TEMPLATE_PATH):
     last_updated = 'Last updated: ' + datetime.date.today().strftime('%B %d, %Y')
     current_year = datetime.date.today().strftime('%Y')
     configuration = get_configuration()
+    article_preview = extract_article_preview(article)
     blog_post = template.format(nav_bar=nav_bar,
                                 article_title=article_title,
                                 article_content=article_content_html,
@@ -288,7 +290,8 @@ def generate_post(article, template_path=TEMPLATE_PATH):
                                 rss_feed_path=configuration.rss_feed_path,
                                 style_sheet=configuration.style_sheet,
                                 root_url=configuration.root_url,
-                                home_page_link='../')
+                                home_page_link='../',
+                                description=article_preview.intro_text)
 
     # Create link to next blog entry.
     article.html = blog_post

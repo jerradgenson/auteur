@@ -47,7 +47,8 @@ _CONFIGURATION_FILE_FIELDS = {'rss_feed_path': Path,
                               'blog_subtitle': str,
                               'owner': str,
                               'email_address': str,
-                              'style_sheet': str}
+                              'style_sheet': str,
+                              'description': str}
 
 
 Configuration = namedtuple('Configuration', ['program_name'] + list(_CONFIGURATION_FILE_FIELDS))

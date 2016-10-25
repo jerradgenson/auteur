@@ -289,6 +289,37 @@ def _create_get_article_database():
     return get_article_database
 
 
+def build_article_url(root_url, article_path):
+    """
+    Build URL for blog article. Using this function will ensure the URL is constructed correctly, regardless of what
+    platform the article path is for.
+
+    Args
+      root_url: URL string to website root directory.
+      article_path: Path to the article on the server relative to the website root as either a string or Path object.
+
+    Return
+      A URL string for the blog article.
+
+    """
+
+    article_path_string = str(article_path)
+
+    # Convert backlashes to forward slashes in case this is a Windows path.
+    article_path_string = article_path_string.replace('\\', '/')
+
+    # Remove existing slashes between parts of the URL to make sure they're joined correctly.
+    if root_url[-1] == '/':
+        root_url = root_url[:-1]
+
+    if article_path_string[0] == '/':
+        article_path_string = article_path_string[1:]
+
+    article_url = '/'.join((root_url, article_path_string))
+
+    return article_url
+
+
 class Article:
     """
     Information needed to construct a blog article.
@@ -306,9 +337,10 @@ class Article:
         self.target = Path(target) if target else None
         self.pub_date = pub_date
         self.html = html
-        self.markdown = markdown
         self.title = title
         self.__article_database = None
+        self.__url = None
+        self.__markdown = markdown
 
     def pub_date_today(self):
         """
@@ -392,6 +424,25 @@ class Article:
     @property
     def human_readable_pub_date(self):
         return self.pub_date.strftime('%B %d, %Y')
+
+    @property
+    def url(self):
+        if self.__url:
+            return self.__url
+
+        else:
+            configuration = get_configuration()
+            self.__url = build_article_url(configuration.root_url, self.target)
+            return self.__url
+
+    @property
+    def markdown(self):
+        if self.__markdown:
+            return self.__markdown
+
+        else:
+            self.__markdown = read_complete_file(self.source)
+            return self.__markdown
 
     @staticmethod
     def date_string_to_datetime(date_string):

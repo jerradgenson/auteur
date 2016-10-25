@@ -11,7 +11,6 @@ Copyright 2016 Jerrad Michael Genson
 # Python built-in modules
 import datetime
 import re
-from collections import namedtuple
 from pathlib import Path
 
 # First-party modules
@@ -110,10 +109,6 @@ def extract_meta_description(article):
     Extract meta description from an article.
     """
 
-    # Read markdown into memory if it isn't already been read.
-    if not article.markdown:
-        article.markdown = file_tools.read_complete_file(article.source)
-
     # Iterate over lines in markdown file and build meta description.
     description = ''
     for line in article.markdown.split('\n'):
@@ -142,6 +137,37 @@ def extract_meta_description(article):
         description = description.replace(match, new)
 
     return description
+
+
+def extract_first_image_url(article):
+    """
+    Extract URL of the first image in an article.
+    If no URL could be found, return an empty string instead.
+    """
+
+    markdown_match = re.search('!\[.*?\]\(.*?\)', article.markdown)
+    if markdown_match:
+        markdown_image = re.search('\(.*?\)',  markdown_match.group(0)).group(0)[1:-1]
+
+    html_match = re.search('<img.*?>', article.markdown)
+    if html_match:
+        html_image = re.search('src=".*?"', html_match.group(0)).group(0)[5:-1]
+
+    if markdown_match and html_match:
+        if article.markdown.index(markdown_image) < article.markdown.index(html_image):
+            return markdown_image
+
+        else:
+            return html_image
+
+    elif html_match:
+        return html_image
+
+    elif markdown_match:
+        return markdown_image
+
+    else:
+        return ''
 
 
 def generate_preview_html(article_preview):
@@ -217,7 +243,9 @@ def generate_landing_page(template_path=TEMPLATE_PATH):
                                                 style_sheet=configuration.style_sheet,
                                                 root_url=configuration.root_url,
                                                 home_page_link='',
-                                                description=configuration.description)
+                                                description=configuration.description,
+                                                article_url=configuration.root_url,
+                                                article_image='')
 
     return landing_page_html
 
@@ -317,6 +345,7 @@ def generate_post(article, template_path=TEMPLATE_PATH):
     current_year = datetime.date.today().strftime('%Y')
     configuration = get_configuration()
     description = extract_meta_description(article)
+    first_image = extract_first_image_url(article)
     blog_post = template.format(nav_bar=nav_bar,
                                 article_title=article_title,
                                 article_content=article_content_html,
@@ -330,7 +359,9 @@ def generate_post(article, template_path=TEMPLATE_PATH):
                                 style_sheet=configuration.style_sheet,
                                 root_url=configuration.root_url,
                                 home_page_link='../',
-                                description=description)
+                                description=description,
+                                article_url=article.url,
+                                article_image=first_image)
 
     # Create link to next blog entry.
     article.html = blog_post

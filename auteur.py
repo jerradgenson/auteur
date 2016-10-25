@@ -27,9 +27,9 @@ import datetime
 import re
 from pathlib import Path
 
-# First-party modules
 import file_tools
 from data import RSS_TEMPLATE, RSS_ITEM_TEMPLATE
+from file_tools import build_article_url
 from html_tools import generate_landing_page, generate_post, create_article_previews
 
 
@@ -174,37 +174,6 @@ def create_rss_feed():
                                       article_description=text)
 
     return rss_template.format(items=items)
-
-
-def build_article_url(root_url, article_path):
-    """
-    Build URL for blog article. Using this function will ensure the URL is constructed correctly, regardless of what
-    platform the article path is for.
-
-    Args
-      root_url: URL string to website root directory.
-      article_path: Path to the article on the server relative to the website root as either a string or Path object.
-
-    Return
-      A URL string for the blog article.
-
-    """
-
-    article_path_string = str(article_path)
-
-    # Convert backlashes to forward slashes in case this is a Windows path.
-    article_path_string = article_path_string.replace('\\', '/')
-
-    # Remove existing slashes between parts of the URL to make sure they're joined correctly.
-    if root_url[-1] == '/':
-        root_url = root_url[:-1]
-
-    if article_path_string[0] == '/':
-        article_path_string = article_path_string[1:]
-
-    article_url = '/'.join((root_url, article_path_string))
-
-    return article_url
 
 
 def parse_command_line():

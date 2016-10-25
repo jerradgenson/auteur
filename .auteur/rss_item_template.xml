@@ -1,0 +1,13 @@
+<item>
+<title>{article_title}</title>
+<link>{article_url}</link>
+<guid>{article_url}</guid>
+<pubDate>{article_date}</pubDate>
+<description>
+<html>
+<body>
+{article_description}
+</body>
+</html>
+</description>
+</item>

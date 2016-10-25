@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0">
+<channel>
+<title>Recursive Descent</title>
+<link>http://www.jerradgenson.com:8080/recursive-descent</link>
+<image>
+    <url>http://www.jerradgenson.com:8080/recursive-descent/recursive-descent.jpg</url>
+    <title>Recursive Descent</title>
+    <link>http://www.jerradgenson.com:8080/recursive-descent</link>
+</image>
+<description>The science and technology blog by software engineer Jerrad Genson.</description>
+{items}
+</channel>
+</rss>

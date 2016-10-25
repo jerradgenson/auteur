@@ -105,6 +105,45 @@ def extract_article_preview(article):
     return article_preview
 
 
+def extract_meta_description(article):
+    """
+    Extract meta description from an article.
+    """
+
+    # Read markdown into memory if it isn't already been read.
+    if not article.markdown:
+        article.markdown = file_tools.read_complete_file(article.source)
+
+    # Iterate over lines in markdown file and build meta description.
+    description = ''
+    for line in article.markdown.split('\n'):
+        if line.strip() and line[0] not in '=*-+#< ':
+            # This line is not blank and does not start with any HTML or
+            # Markdown code; add it to meta description.
+            description += line
+
+        elif description:
+            # Reached the end of the first paragraph.
+            break
+
+    # Replace double quotes with single quotes to avoid interfering with HTML.
+    description = description.replace('"', "'")
+
+    # Find and remove all Markdown links in meta description.
+    matches = re.findall('\[.*?\]\(.*?\)', description)
+    for match in matches:
+        # Remove hyperlink portion.
+        new = re.sub('\(.*?\)', '', match)
+
+        # Remove opening and closing square brackets.
+        new = new[1:-1]
+
+        # Replace old text containing Markdown code with new text w/o Markdown.
+        description = description.replace(match, new)
+
+    return description
+
+
 def generate_preview_html(article_preview):
     """
     Generate HTML for an `ArticlePreview` object.
@@ -277,7 +316,7 @@ def generate_post(article, template_path=TEMPLATE_PATH):
     last_updated = 'Last updated: ' + datetime.date.today().strftime('%B %d, %Y')
     current_year = datetime.date.today().strftime('%Y')
     configuration = get_configuration()
-    article_preview = extract_article_preview(article)
+    description = extract_meta_description(article)
     blog_post = template.format(nav_bar=nav_bar,
                                 article_title=article_title,
                                 article_content=article_content_html,
@@ -291,7 +330,7 @@ def generate_post(article, template_path=TEMPLATE_PATH):
                                 style_sheet=configuration.style_sheet,
                                 root_url=configuration.root_url,
                                 home_page_link='../',
-                                description=article_preview.intro_text)
+                                description=description)
 
     # Create link to next blog entry.
     article.html = blog_post

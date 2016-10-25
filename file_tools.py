@@ -22,6 +22,12 @@ import markdown
 from data import CONFIG_FILE_PATH, PROGRAM_NAME
 
 
+# re pattern to match `Previous` link.
+_PREVIOUS_PATTERN = '<a href=".*?">Previous</a>'
+
+# String template for new `Previous` tag text.
+_PREVIOUS_TAG_TEMPLATE = '<a href="{}">Previous</a>'
+
 # re pattern to match `Next` link.
 _NEXT_PATTERN = 'Home</a> <a href=".*?">Next</a>'
 
@@ -62,6 +68,20 @@ def insert_next_link(target_article, next_article):
 
     else:
         target_article.html = target_article.html.replace(_NEXT_TAG_KEY, next_tag_template)
+
+
+def insert_previous_link(target_article, previous_article):
+    """
+    Insert a `Previous` link to `previous_article` in `target_article`.
+    """
+
+    if not target_article.html:
+        target_article.html = read_complete_file(target_article.html_path)
+
+    previous_tag_template = _PREVIOUS_TAG_TEMPLATE.format(Path('../') / previous_article.target)
+    match = re.search(_PREVIOUS_PATTERN, target_article.html)
+    if match:
+        target_article.html = target_article.html.replace(match.group(0), previous_tag_template)
 
 
 def read_json_file(file_path):
@@ -114,6 +134,11 @@ def write_post(article):
         # Insert `Next` link in previous article.
         insert_next_link(previous_article, article)
         write_complete_file(previous_article.html, previous_article.html_path)
+
+    next_article = article.next()
+    if next_article:
+        insert_previous_link(next_article, article)
+        write_complete_file(next_article.html, next_article.html_path)
 
 
 def parse_markdown_file(input_path):

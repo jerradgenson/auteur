@@ -372,6 +372,18 @@ def generate_vanilla_html(article, template_path=TEMPLATE_PATH):
     return article.html
 
 
+def generate_amp(article):
+    """
+    Generate AMP code for the target article.
+    """
+
+    # TODO: Generate AMP code instead of merely copying vanilla HTML.
+    if not article.html:
+        generate_vanilla_html(article)
+
+    article.amp = article.html
+
+
 def create_article_previews():
     """
     Create ArticlePreview objects for all blog artiles in the listing file.

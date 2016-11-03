@@ -40,18 +40,6 @@ _NEXT_TAG_TEMPLATE = _NEXT_TAG_KEY + ' <a href="{}">Next</a>'
 # Error message to display when there is a problem reading or opening a file.
 _FILE_ERROR = "File at '{}' can not be accessed. Please check file permissions and ensure it is not missing or corrupt."
 
-
-# We have to define this here so _CONFIGURATION_FILE_FIELDS can use it.
-# TODO: Consider moving to a different module.
-def bool_of_str(string):
-    """
-    Convert the strings "True" and "False" to boolean values.
-    Returns `False` if given any value other than "True" (case insensitive).
-    """
-
-    return True if string.lower() == "true" else False
-
-
 # List of fields in the config file along with their respective types.
 _CONFIGURATION_FILE_FIELDS = {'rss_feed_path': Path,
                               'root_url': str,
@@ -61,8 +49,8 @@ _CONFIGURATION_FILE_FIELDS = {'rss_feed_path': Path,
                               'email_address': str,
                               'style_sheet': str,
                               'description': str,
-                              'generate_amp': bool_of_str,
-                              'generate_vanilla_html': bool_of_str}
+                              'generate_amp': bool,
+                              'generate_vanilla_html': bool}
 
 
 Configuration = namedtuple('Configuration', ['program_name'] + list(_CONFIGURATION_FILE_FIELDS))

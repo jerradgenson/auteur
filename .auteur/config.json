@@ -6,5 +6,7 @@
     "owner": " ",
     "email_address": " ",
     "style_sheet": " ",
-    "description": " "
+    "description": " ",
+    "generate_amp": true,
+    "generate_vanilla_html": true,
 }

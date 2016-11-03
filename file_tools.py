@@ -40,6 +40,18 @@ _NEXT_TAG_TEMPLATE = _NEXT_TAG_KEY + ' <a href="{}">Next</a>'
 # Error message to display when there is a problem reading or opening a file.
 _FILE_ERROR = "File at '{}' can not be accessed. Please check file permissions and ensure it is not missing or corrupt."
 
+
+# We have to define this here so _CONFIGURATION_FILE_FIELDS can use it.
+# TODO: Consider moving to a different module.
+def bool_of_str(string):
+    """
+    Convert the strings "True" and "False" to boolean values.
+    Returns `False` if given any value other than "True" (case insensitive).
+    """
+
+    return True if string.lower() == "true" else False
+
+
 # List of fields in the config file along with their respective types.
 _CONFIGURATION_FILE_FIELDS = {'rss_feed_path': Path,
                               'root_url': str,
@@ -48,41 +60,54 @@ _CONFIGURATION_FILE_FIELDS = {'rss_feed_path': Path,
                               'owner': str,
                               'email_address': str,
                               'style_sheet': str,
-                              'description': str}
+                              'description': str,
+                              'generate_amp': bool_of_str,
+                              'generate_vanilla_html': bool_of_str}
 
 
 Configuration = namedtuple('Configuration', ['program_name'] + list(_CONFIGURATION_FILE_FIELDS))
 
 
-def insert_next_link(target_article, next_article):
+def insert_next_link(target_article, next_article, amp=False):
     """
     Insert a `Next` link to `next_article` in `target_article`.
     """
 
-    if not target_article.html:
-        target_article.html = read_complete_file(target_article.html_path)
+    target_html = target_article.amp if amp else target_article.html
+    next_link = _NEXT_TAG_TEMPLATE.format(Path('../') / next_article.target)
 
-    next_tag_template = _NEXT_TAG_TEMPLATE.format(Path('../') / next_article.target)
-    match = re.search(_NEXT_PATTERN, target_article.html)
+    # Check if next link is already present.
+    match = re.search(_NEXT_PATTERN, target_html)
     if match:
-        target_article.html = target_article.html.replace(match.group(0), next_tag_template)
+        # Yes, replace current next link.
+        target_html = target_html.replace(match.group(0), next_link)
 
     else:
-        target_article.html = target_article.html.replace(_NEXT_TAG_KEY, next_tag_template)
+        # No, add next link for the first time.
+        target_html = target_html.replace(_NEXT_TAG_KEY, next_link)
+
+    if amp:
+        target_article.amp = target_html
+
+    else:
+        target_article.html = target_html
 
 
-def insert_previous_link(target_article, previous_article):
+def insert_previous_link(target_article, previous_article, amp=False):
     """
     Insert a `Previous` link to `previous_article` in `target_article`.
     """
 
-    if not target_article.html:
-        target_article.html = read_complete_file(target_article.html_path)
-
-    previous_tag_template = _PREVIOUS_TAG_TEMPLATE.format(Path('../') / previous_article.target)
-    match = re.search(_PREVIOUS_PATTERN, target_article.html)
+    target_html = target_article.amp if amp else target_article.html
+    previous_link = _PREVIOUS_TAG_TEMPLATE.format(Path('../') / previous_article.target)
+    match = re.search(_PREVIOUS_PATTERN, target_html)
     if match:
-        target_article.html = target_article.html.replace(match.group(0), previous_tag_template)
+        target_html = target_html.replace(match.group(0), previous_link)
+        if amp:
+            target_article.amp = target_html
+
+        else:
+            target_article.html = target_html
 
 
 def read_json_file(file_path):
@@ -108,20 +133,24 @@ def read_json_file(file_path):
     return json_object
 
 
-def write_post(article):
+def write_post(article, amp=False):
     """
     Write blog post to filesystem, update previous post, and update listing file.
 
     Args
       article: An instance of Article.
+      amp: Optional. Set to `True` to write AMP file instead of vanilla HTML.
 
     Return
       None
 
     """
 
+    html = article.amp if amp else article.html
+    path = article.amp_path if amp else article.html_path
+
     # Write new blog post to filesystem.
-    write_complete_file(article.html, article.html_path)
+    write_complete_file(html, path)
     try:
         previous_article = article.previous()
 
@@ -133,13 +162,18 @@ def write_post(article):
 
     if previous_article:
         # Insert `Next` link in previous article.
-        insert_next_link(previous_article, article)
-        write_complete_file(previous_article.html, previous_article.html_path)
+        insert_next_link(previous_article, article, amp=amp)
+        previous_html = previous_article.amp if amp else previous_article.html
+        previous_path = previous_article.amp_path if amp else previous_article.html_path
+        write_complete_file(previous_html, previous_path)
 
     next_article = article.next()
     if next_article:
-        insert_previous_link(next_article, article)
-        write_complete_file(next_article.html, next_article.html_path)
+        # Insert `Previous` link in next article.
+        insert_previous_link(next_article, article, amp=amp)
+        next_html = next_article.amp if amp else next_article.html
+        next_path = next_article.amp_path if amp else next_article.html_path
+        write_complete_file(next_html, next_path)
 
 
 def parse_markdown_file(input_path):
@@ -331,16 +365,21 @@ class Article:
 
     DATE_FORMAT = '%Y%m%d%H%M'
     HTML_FILENAME = 'index.html'
+    NO_AMP_FILENAME = 'index-noamp.html'
 
-    def __init__(self, source=None, target=None, pub_date=None, html=None, markdown=None , title=None):
+    def __init__(self, source, target, pub_date, html=None, amp=None, markdown=None, title=None):
         self.source = Path(source) if source else None
         self.target = Path(target) if target else None
-        self.pub_date = pub_date
-        self.html = html
+        self.pub_date = pub_date if pub_date else datetime.today()
+        self.__html = html
+        self.__amp = amp
         self.title = title
         self.__article_database = None
         self.__url = None
         self.__markdown = markdown
+        self.__html_filename = self.NO_AMP_FILENAME if amp else self.HTML_FILENAME
+        self.__amp_filename = self.HTML_FILENAME
+        get_article_database().insert(self)
 
     def pub_date_today(self):
         """
@@ -354,7 +393,7 @@ class Article:
         Set `pub_date` attribute from a datestring of the format `%Y%m%d%H%M`.
         """
 
-        self.pub_date = self.pub_date_str_to_datetime(date_string)
+        self.pub_date = self.date_string_to_datetime(date_string)
 
     def str_from_pub_date(self):
         """
@@ -363,12 +402,12 @@ class Article:
 
         return self.pub_date.strftime(self.DATE_FORMAT)
 
-    def register(self, article_datase):
+    def register(self, article_database):
         """
         Register this article with an article database.
         """
 
-        self.__article_database = article_datase
+        self.__article_database = article_database
 
     def previous(self):
         """
@@ -419,7 +458,15 @@ class Article:
         Path to the article's HTML file.
         """
 
-        return self.target / self.HTML_FILENAME
+        return self.target / self.__html_filename
+
+    @property
+    def amp_path(self):
+        """
+        Path to the article's AMP file.
+        """
+
+        return self.target / self.__amp_filename
 
     @property
     def human_readable_pub_date(self):
@@ -451,6 +498,38 @@ class Article:
         """
 
         return datetime.strptime(date_string, Article.DATE_FORMAT)
+
+    def gethtml(self):
+        if not self.__html:
+            if self.html_path:
+                self.__html = read_complete_file(self.html_path)
+
+            else:
+                return None
+
+        return self.__html
+
+    def sethtml(self, new_html):
+        self.__html = new_html
+
+    html = property(gethtml, sethtml)
+
+    def getamp(self):
+        if not self.__amp:
+            if self.amp_path:
+                self.__amp = read_complete_file(self.amp_path)
+                self.__html_filename = self.NO_AMP_FILENAME
+
+            else:
+                return None
+
+        return self.__amp
+
+    def setamp(self, new_amp):
+        self.__amp = new_amp
+        self.__html_filename = self.NO_AMP_FILENAME
+
+    amp = property(getamp, setamp)
 
 
 class _ArticleDatabase:

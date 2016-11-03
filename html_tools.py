@@ -265,7 +265,7 @@ def preprocess_raw_html(raw_html):
     return article_content
 
 
-def generate_post(article, template_path=TEMPLATE_PATH):
+def generate_vanilla_html(article, template_path=TEMPLATE_PATH):
     """
     Apply blog post template to Markdown-to-HTML translation.
 

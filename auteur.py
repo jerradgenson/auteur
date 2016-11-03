@@ -30,7 +30,7 @@ from pathlib import Path
 import file_tools
 from data import RSS_TEMPLATE, RSS_ITEM_TEMPLATE
 from file_tools import build_article_url
-from html_tools import generate_landing_page, generate_post, create_article_previews
+from html_tools import generate_landing_page, generate_vanilla_html, create_article_previews
 
 
 def auteur():
@@ -66,31 +66,30 @@ def add_new_article(args):
 
     """
 
-    article = file_tools.Article()
-    article.source = args.input_path
-    article.target = article.source.parent
+    configuration = file_tools.get_configuration()
+    source = args.input_path
+    target = source.parent
     if args.pub_date:
-        article.pub_date = datetime.datetime.strptime(args.pub_date, '%B %d, %Y')
+        pub_date = datetime.datetime.strptime(args.pub_date, '%B %d, %Y')
 
     else:
-        article.pub_date_today()
+        pub_date = None
 
-    article_database = file_tools.get_article_database()
-    article_database.insert(article)
-    if article.source.suffix == '.html':
-        # Treat the source file as an html file.
-        article.html = file_tools.read_complete_file(args.input_path)
-
-    else:
+    article = file_tools.Article(source, target, pub_date)
+    if source.suffix != '.html':
         # Translate Markdown input into HTML.
-        article.html = file_tools.parse_markdown_file(article.source)
+        article.html = file_tools.parse_markdown_file(source)
 
         # Apply blog post template to Markdown-to-HTML translation.
-        article.html = generate_post(article)
+        article.html = generate_vanilla_html(article)
+
+        if configuration.generate_amp:
+            article.amp = generate_amp(article)
+            file_tools.write_post(article, amp=True)
 
     # Write blog post to filesystem, update previous post.
     file_tools.write_post(article)
-    article_database.commit()
+    file_tools.get_article_database().commit()
 
 
 def remove_article(args):
@@ -120,6 +119,7 @@ def build_website(args):
 
     """
 
+    configuration = file_tools.get_configuration()
     article_database = file_tools.get_article_database()
 
     # Now iterate over each article in the database and regenerate the corresponding web page.
@@ -129,7 +129,11 @@ def build_website(args):
             article.html = file_tools.parse_markdown_file(article.source)
 
             # Apply blog post template to article content.
-            article.html = generate_post(article)
+            article.html = generate_vanilla_html(article)
+
+            if configuration.generate_amp:
+                article.amp = generate_amp(article)
+                file_tools.write_post(article, amp=True)
 
         else:
             # A corresponding markdown file doesn't exist, so get content from HTML file instead.

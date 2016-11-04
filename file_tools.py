@@ -121,49 +121,6 @@ def read_json_file(file_path):
     return json_object
 
 
-def write_post(article, amp=False):
-    """
-    Write blog post to filesystem, update previous post, and update listing file.
-
-    Args
-      article: An instance of Article.
-      amp: Optional. Set to `True` to write AMP file instead of vanilla HTML.
-
-    Return
-      None
-
-    """
-
-    html = article.amp if amp else article.html
-    path = article.amp_path if amp else article.html_path
-
-    # Write new blog post to filesystem.
-    write_complete_file(html, path)
-    try:
-        previous_article = article.previous()
-
-    except AttributeError:
-        article_database = get_article_database()
-        article_database.insert(article)
-        article_database.commit()
-        previous_article = article.previous()
-
-    if previous_article:
-        # Insert `Next` link in previous article.
-        insert_next_link(previous_article, article, amp=amp)
-        previous_html = previous_article.amp if amp else previous_article.html
-        previous_path = previous_article.amp_path if amp else previous_article.html_path
-        write_complete_file(previous_html, previous_path)
-
-    next_article = article.next()
-    if next_article:
-        # Insert `Previous` link in next article.
-        insert_previous_link(next_article, article, amp=amp)
-        next_html = next_article.amp if amp else next_article.html
-        next_path = next_article.amp_path if amp else next_article.html_path
-        write_complete_file(next_html, next_path)
-
-
 def parse_markdown_file(input_path):
     """
     Translate Markdown input into HTML.
@@ -242,6 +199,16 @@ def write_complete_file(file_text, file_path):
     """
 
     _handle_file(file_path, file_text)
+
+
+def validate_configuration():
+    """
+    Check that the configuration file is readable and contains valid values.
+    """
+
+    configuration = get_configuration()
+    if not (configuration.generate_amp or configuration.generate_vanilla_html):
+        raise ConfigFileError('generate_amp and generate_vanilla_html can not both be false.')
 
 
 def _create_get_configuration():
@@ -355,7 +322,8 @@ class Article:
     HTML_FILENAME = 'index.html'
     NO_AMP_FILENAME = 'index-noamp.html'
 
-    def __init__(self, source, target, pub_date, html=None, amp=None, markdown=None, title=None):
+    def __init__(self, source, target, pub_date, html=None, amp=None, markdown=None, title=None,
+                 html_filename=None, amp_filename=None):
         self.source = Path(source) if source else None
         self.target = Path(target) if target else None
         self.pub_date = pub_date if pub_date else datetime.today()
@@ -365,9 +333,76 @@ class Article:
         self.__article_database = None
         self.__url = None
         self.__markdown = markdown
-        self.__html_filename = self.NO_AMP_FILENAME if amp else self.HTML_FILENAME
-        self.__amp_filename = self.HTML_FILENAME
-        get_article_database().insert(self)
+        self.__html_read_path = target / html_filename if html_filename else None
+        self.__amp_read_path = target / amp_filename if amp_filename else None
+        configuration = get_configuration()
+        if configuration.generate_amp:
+            self.__html_write_path = target / self.NO_AMP_FILENAME
+
+        else:
+            self.__html_write_path = target / self.HTML_FILENAME
+
+        if amp_filename:
+            self.__amp_write_path = self.__amp_read_path
+
+        elif configuration.generate_amp:
+            self.__amp_write_path = target / self.HTML_FILENAME
+
+        else:
+            self.__amp_write_path = None
+
+    def write(self, amp=False):
+        """
+        Write AMP and HTML articles (as applicable) to filesystem.
+
+        Return
+          None
+
+        """
+
+        configuration = get_configuration()
+        if amp:
+            if not self.amp:
+                return
+
+            html = self.amp
+            path = self.__amp_write_path
+
+        else:
+            if not (self.html and configuration.generate_vanilla_html):
+                # Recurse to write AMP file.
+                return self.write(True)
+
+            html = self.html
+            path = self.__html_write_path
+
+        # Write new blog post to filesystem.
+        write_complete_file(html, path)
+        if amp:
+            self.__amp_read_path = self.__amp_write_path
+
+        else:
+            self.__html_read_path = self.__html_write_path
+
+        if not amp:
+            # Recurse to write AMP file.
+            self.write(True)
+
+    def update_links(self, amp=False):
+        """
+        Update links to next and previous articles.
+        """
+
+        if self.previous:
+            # Insert link to previous article
+            insert_previous_link(self, self.previous, amp=amp)
+
+        if self.next:
+            # Insert link to next article.
+            insert_next_link(self, self.next, amp=amp)
+
+        if self.amp and not amp:
+            self.update_links(True)
 
     def pub_date_today(self):
         """
@@ -397,13 +432,14 @@ class Article:
 
         self.__article_database = article_database
 
+    @property
     def previous(self):
         """
         Return previous article in article database.
         """
 
         if not self.__article_database:
-            raise AttributeError('Article not registered with database.')
+            raise DatabaseError('Article is not registered with a database.')
 
         previous_article = None
         for article in self.__article_database:
@@ -412,13 +448,14 @@ class Article:
 
             previous_article = article
 
+    @property
     def next(self):
         """
         Return next article in article database.
         """
 
         if not self.__article_database:
-            raise AttributeError('Article not registered with database.')
+            raise DatabaseError('Article is not registered with a database.')
 
         found = False
         for article in self.__article_database:
@@ -438,7 +475,10 @@ class Article:
         source = str(self.source) if self.source else '__None__'
         target = str(self.target) if self.target else '__None__'
         title = self.title if self.title else '__None__'
-        return {'source': source, 'target': target, 'pub_date': pub_date_str, 'title': title}
+        html_filename = self.html_path.name if self.html_path else '__None__'
+        amp_filename = self.amp_path.name if self.amp else '__None__'
+        return {'source': source, 'target': target, 'pub_date': pub_date_str, 'title': title,
+                'html_filename': html_filename, 'amp_filename': amp_filename}
 
     @property
     def html_path(self):
@@ -446,7 +486,7 @@ class Article:
         Path to the article's HTML file.
         """
 
-        return self.target / self.__html_filename
+        return self.__html_read_path
 
     @property
     def amp_path(self):
@@ -454,7 +494,7 @@ class Article:
         Path to the article's AMP file.
         """
 
-        return self.target / self.__amp_filename
+        return self.__amp_read_path
 
     @property
     def human_readable_pub_date(self):
@@ -490,7 +530,11 @@ class Article:
     def gethtml(self):
         if not self.__html:
             if self.html_path:
-                self.__html = read_complete_file(self.html_path)
+                try:
+                    self.__html = read_complete_file(self.html_path)
+
+                except OSError:
+                    return None
 
             else:
                 return None
@@ -505,8 +549,14 @@ class Article:
     def getamp(self):
         if not self.__amp:
             if self.amp_path:
-                self.__amp = read_complete_file(self.amp_path)
-                self.__html_filename = self.NO_AMP_FILENAME
+                try:
+                    self.__amp = read_complete_file(self.amp_path)
+
+                except OSError:
+                    return None
+
+                else:
+                    self.__html_write_path = self.target / self.NO_AMP_FILENAME
 
             else:
                 return None
@@ -515,7 +565,7 @@ class Article:
 
     def setamp(self, new_amp):
         self.__amp = new_amp
-        self.__html_filename = self.NO_AMP_FILENAME
+        self.__html_write_path = self.target / self.NO_AMP_FILENAME
 
     amp = property(getamp, setamp)
 
@@ -525,20 +575,24 @@ class _ArticleDatabase:
     Interface for article database.
     """
 
-    DATABASE_PATH = Path('.auteur/listing.json')
+    DATABASE_PATH = Path('.auteur/database.json')
 
     def __init__(self, articles):
         if not articles:
             try:
                 self.articles = []
                 for article_json in read_json_file(self.DATABASE_PATH):
-                    source = article_json['source']
-                    source = None if source == '__None__' else source
-                    target = article_json['target']
-                    target = None if target == '__None__' else target
+                    source = Path(self.string_or_none(article_json['source']))
+                    target = Path(self.string_or_none(article_json['target']))
+                    html_filename = self.string_or_none(article_json['html_filename'])
+                    amp_filename = self.string_or_none(article_json['amp_filename'])
                     pub_date = Article.date_string_to_datetime(article_json['pub_date'])
                     title = article_json['title']
-                    article = Article(source, target, pub_date, title=title)
+                    article = Article(source, target, pub_date,
+                                      title=title,
+                                      html_filename=html_filename,
+                                      amp_filename=amp_filename)
+
                     article.register(self)
                     self.articles.append(article)
 
@@ -619,6 +673,26 @@ class _ArticleDatabase:
                 return index
 
         raise ValueError('article not in listing')
+
+    @staticmethod
+    def string_or_none(string):
+        """
+        If `string` is equal to `__None__`, return `None`; otherwise, return `String`.
+        """
+
+        return None if string == '__None__' else string
+
+
+class DatabaseError(Exception):
+    """
+    Indicates an exception related to the `ArticleDatabase`.
+    """
+
+
+class ConfigFileError(Exception):
+    """
+    Indicates an exception related to the configuration file.
+    """
 
 
 # Create 'get_configuration' and `get_article_database` functions.

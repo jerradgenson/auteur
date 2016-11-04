@@ -71,7 +71,8 @@ def extract_article_preview(article):
 
     """
 
-    article_text = read_complete_file(article.html_path)
+    html_path = article.html_path if article.html_path.exists() else article.amp_path
+    article_text = read_complete_file(html_path)
 
     # Extract introductory text..
     paragraphs = article_text.split('<p>')
@@ -265,7 +266,7 @@ def preprocess_raw_html(raw_html):
     return article_content
 
 
-def generate_vanilla_html(article, template_path=TEMPLATE_PATH):
+def generate_html(article, template_path=TEMPLATE_PATH):
     """
     Apply blog post template to Markdown-to-HTML translation.
 
@@ -322,10 +323,10 @@ def generate_vanilla_html(article, template_path=TEMPLATE_PATH):
     # Apply HTML template to article content.
     article_content_html = _ARTICLE_CONTENT_TEMPLATE.format(article_content=article_content)
 
+    # TODO: Consider removing link creation code.
     # Create link to previous blog entry.
-    previous_article = article.previous()
-    if previous_article:
-        previous_article_link = Path('../') / previous_article.target
+    if article.previous:
+        previous_article_link = Path('../') / article.previous.target
 
     else:
         # This is the first blog post; there is no previous article.
@@ -336,7 +337,7 @@ def generate_vanilla_html(article, template_path=TEMPLATE_PATH):
 
     # Insert link to previous article in nav bar template.
     nav_bar = _NAV_BAR_TEMPLATE.format(previous_article=previous_article_link)
-    if not previous_article:
+    if not article.previous:
         # No previous articles exist, so remove the `Previous` link from navigation bar.
         nav_bar = nav_bar.replace('<a href="">Previous</a>', '')
 
@@ -346,30 +347,24 @@ def generate_vanilla_html(article, template_path=TEMPLATE_PATH):
     configuration = get_configuration()
     description = extract_meta_description(article)
     first_image = extract_first_image_url(article)
-    blog_post = template.format(nav_bar=nav_bar,
-                                article_title=article_title,
-                                article_content=article_content_html,
-                                last_updated=last_updated,
-                                current_year=current_year,
-                                blog_title=configuration.blog_title,
-                                blog_subtitle=configuration.blog_subtitle,
-                                owner=configuration.owner,
-                                email_address=configuration.email_address,
-                                rss_feed_path=configuration.rss_feed_path,
-                                style_sheet=configuration.style_sheet,
-                                root_url=configuration.root_url,
-                                home_page_link='../',
-                                description=description,
-                                article_url=article.url,
-                                article_image=first_image)
+    html = template.format(nav_bar=nav_bar,
+                           article_title=article_title,
+                           article_content=article_content_html,
+                           last_updated=last_updated,
+                           current_year=current_year,
+                           blog_title=configuration.blog_title,
+                           blog_subtitle=configuration.blog_subtitle,
+                           owner=configuration.owner,
+                           email_address=configuration.email_address,
+                           rss_feed_path=configuration.rss_feed_path,
+                           style_sheet=configuration.style_sheet,
+                           root_url=configuration.root_url,
+                           home_page_link='../',
+                           description=description,
+                           article_url=article.url,
+                           article_image=first_image)
 
-    # Create link to next blog entry.
-    article.html = blog_post
-    next_article = article.next()
-    if next_article:
-        file_tools.insert_next_link(article, next_article)
-
-    return article.html
+    return html
 
 
 def generate_amp(article):
@@ -378,10 +373,7 @@ def generate_amp(article):
     """
 
     # TODO: Generate AMP code instead of merely copying vanilla HTML.
-    if not article.html:
-        generate_vanilla_html(article)
-
-    article.amp = article.html
+    return article.html if article.html else generate_html(article)
 
 
 def create_article_previews():

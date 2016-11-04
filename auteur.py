@@ -30,7 +30,7 @@ from pathlib import Path
 import file_tools
 from data import RSS_TEMPLATE, RSS_ITEM_TEMPLATE
 from file_tools import build_article_url
-from html_tools import generate_landing_page, generate_vanilla_html, create_article_previews
+from html_tools import generate_landing_page, generate_html, create_article_previews, generate_amp
 
 
 def auteur():
@@ -39,6 +39,7 @@ def auteur():
 
     try:
         cl_args = parse_command_line()
+        file_tools.validate_configuration()
         cl_args.func(cl_args)
         configuration = file_tools.get_configuration()
         landing_page = generate_landing_page()
@@ -76,20 +77,30 @@ def add_new_article(args):
         pub_date = None
 
     article = file_tools.Article(source, target, pub_date)
+    database = file_tools.get_article_database()
+    database.insert(article)
     if source.suffix != '.html':
         # Translate Markdown input into HTML.
         article.html = file_tools.parse_markdown_file(source)
 
         # Apply blog post template to Markdown-to-HTML translation.
-        article.html = generate_vanilla_html(article)
+        article.html = generate_html(article)
 
         if configuration.generate_amp:
             article.amp = generate_amp(article)
-            file_tools.write_post(article, amp=True)
 
-    # Write blog post to filesystem, update previous post.
-    file_tools.write_post(article)
-    file_tools.get_article_database().commit()
+    # Write blog post to filesystem, update previous and next articles.
+    article.update_links()
+    article.write()
+    if article.previous:
+        article.previous.update_links()
+        article.previous.write()
+
+    if article.next:
+        article.next.update_links()
+        article.next.write()
+
+    database.commit()
 
 
 def remove_article(args):
@@ -129,18 +140,19 @@ def build_website(args):
             article.html = file_tools.parse_markdown_file(article.source)
 
             # Apply blog post template to article content.
-            article.html = generate_vanilla_html(article)
-
-            if configuration.generate_amp:
-                article.amp = generate_amp(article)
-                file_tools.write_post(article, amp=True)
+            article.html = generate_html(article)
 
         else:
             # A corresponding markdown file doesn't exist, so get content from HTML file instead.
             article.html = file_tools.read_complete_file(article.html_path)
 
-        # Write blog post to filesystem and update previous post.
-        file_tools.write_post(article)
+        if configuration.generate_amp:
+            article.amp = generate_amp(article)
+
+        article.update_links()
+        article.write()
+
+    article_database.commit()
 
 
 def create_rss_feed():

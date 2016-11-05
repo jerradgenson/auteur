@@ -28,4 +28,10 @@ RSS_ITEM_TEMPLATE = Path('.auteur/rss_item_template.xml')
 TEMPLATE_PATH = Path('.auteur/template.html')
 
 # Relative path to the home page.
-HOME_PAGE_LINK = '../index.html'
+HOMEPAGE_LINK = '../index.html'
+
+# Default homepage name for vanilla HTML websites.
+HOMEPAGE_NAME = Path('index.html')
+
+# Alternate homepage name for the HTML version in AMP websites.
+NO_AMP_HOMEPAGE_NAME = Path('index-noamp.html')

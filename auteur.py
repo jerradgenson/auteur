@@ -27,23 +27,33 @@ import datetime
 import re
 from pathlib import Path
 
+# TODO: from-style imports are becoming unwieldy and should be removed.
+import html_tools
 import file_tools
+import data
 from data import RSS_TEMPLATE, RSS_ITEM_TEMPLATE
 from file_tools import build_article_url
-from html_tools import generate_landing_page, generate_html, create_article_previews, generate_amp
+from html_tools import generate_html_homepage, generate_html, create_article_previews, generate_amp
 
 
 def auteur():
     """ Program's "main" function. Execution normally starts here. """
-
 
     try:
         cl_args = parse_command_line()
         file_tools.validate_configuration()
         cl_args.func(cl_args)
         configuration = file_tools.get_configuration()
-        landing_page = generate_landing_page()
-        file_tools.write_complete_file(landing_page, Path('index.html'))
+        html_path = data.HOMEPAGE_NAME
+        if configuration.generate_amp:
+            html_path = data.NO_AMP_HOMEPAGE_NAME
+            amp_homepage = html_tools.generate_amp_homepage()
+            file_tools.write_complete_file(amp_homepage, data.HOMEPAGE_NAME)
+
+        if configuration.generate_vanilla_html:
+            html_homepage = generate_html_homepage()
+            file_tools.write_complete_file(html_homepage, html_path)
+
         rss_feed = create_rss_feed()
         file_tools.write_complete_file(rss_feed, configuration.rss_feed_path)
 

@@ -202,16 +202,16 @@ def generate_preview_html(article_preview):
     return preview_html
 
 
-def generate_landing_page(template_path=TEMPLATE_PATH):
+def generate_html_homepage(template_path=TEMPLATE_PATH):
     """
-    Create new landing page — the "home page" for Recursive Descent.
-
+    Generate a vanilla HTML homepage that lists a preview of all blog articles
+    in reverse chronological order.
 
     Args
       template_path: Path to the article template file.
 
     Return
-      An HTML string for the blog site landing page.
+      An HTML string of the full homepage code.
 
     """
 
@@ -231,25 +231,37 @@ def generate_landing_page(template_path=TEMPLATE_PATH):
     configuration = get_configuration()
 
     # Apply blog article template to aggregate content.
-    landing_page_html = article_template.format(article_title=configuration.blog_title,
-                                                nav_bar='',
-                                                article_content=aggregate_html,
-                                                last_updated=last_updated,
-                                                current_year=current_year,
-                                                blog_title=configuration.blog_title,
-                                                blog_subtitle=configuration.blog_subtitle,
-                                                owner=configuration.owner,
-                                                email_address=configuration.email_address,
-                                                rss_feed_path=configuration.rss_feed_path,
-                                                style_sheet=configuration.style_sheet,
-                                                root_url=configuration.root_url,
-                                                home_page_link='',
-                                                description=configuration.description,
-                                                article_url=configuration.root_url,
-                                                article_image='')
+    html_homepage = article_template.format(article_title=configuration.blog_title,
+                                            nav_bar='',
+                                            article_content=aggregate_html,
+                                            last_updated=last_updated,
+                                            current_year=current_year,
+                                            blog_title=configuration.blog_title,
+                                            blog_subtitle=configuration.blog_subtitle,
+                                            owner=configuration.owner,
+                                            email_address=configuration.email_address,
+                                            rss_feed_path=configuration.rss_feed_path,
+                                            style_sheet=configuration.style_sheet,
+                                            root_url=configuration.root_url,
+                                            home_page_link='',
+                                            description=configuration.description,
+                                            article_url=configuration.root_url,
+                                            article_image='')
 
-    return landing_page_html
+    return html_homepage
 
+
+def generate_amp_homepage():
+    """
+    Generate an AMP homepage that lists a preview of all blog articles in
+    reverse chronological order.
+
+    Return
+      An AMP string of the full homepage code.
+
+    """
+
+    return generate_html_homepage()
 
 def preprocess_raw_html(raw_html):
     """

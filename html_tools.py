@@ -418,5 +418,10 @@ class ArticlePreview(Article):
     def __init__(self, article, intro_text, first_photo):
         self.intro_text = intro_text
         self.first_photo = first_photo
-        super().__init__(article.source, article.target, article.pub_date, article.html, article.markdown,
-                         article.title)
+        super().__init__(article.source,
+                         article.target,
+                         article.pub_date,
+                         html=article.html,
+                         amp=article.amp,
+                         markdown=article.markdown,
+                         title=article.title)

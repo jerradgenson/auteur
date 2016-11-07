@@ -263,6 +263,7 @@ def generate_amp_homepage():
 
     return generate_html_homepage()
 
+
 def preprocess_raw_html(raw_html):
     """
     Perform preprocessing on raw HTML source files before calling `generate_post`.
@@ -278,17 +279,9 @@ def preprocess_raw_html(raw_html):
     return article_content
 
 
-def generate_html(article, template_path=TEMPLATE_PATH):
+def parse_article(article):
     """
-    Apply blog post template to Markdown-to-HTML translation.
-
-    Args
-      article: An instance of file_tools.Article.
-      template_path: Path to blog post template file. (Optional)
-
-    Return
-      Final blog post HTML string.
-
+    Parse article and generate final components.
     """
 
     # Find top-level heading tag in HTML and turn it into article title.
@@ -314,6 +307,8 @@ def generate_html(article, template_path=TEMPLATE_PATH):
                                                         article_subtitle=article.human_readable_pub_date,
                                                         article_path='')
 
+    article.title_html = article_title_html
+
     # Remove heading from article content, then reinsert it as the article's title.
     html = re.sub('<h2.+?</h2>', '', article.html)
     html = html.replace(article_title_match.group(0), '')
@@ -334,6 +329,7 @@ def generate_html(article, template_path=TEMPLATE_PATH):
 
     # Apply HTML template to article content.
     article_content_html = _ARTICLE_CONTENT_TEMPLATE.format(article_content=article_content)
+    article.content = article_content_html
 
     # TODO: Consider removing link creation code.
     # Create link to previous blog entry.
@@ -344,26 +340,45 @@ def generate_html(article, template_path=TEMPLATE_PATH):
         # This is the first blog post; there is no previous article.
         previous_article_link = ''
 
-    # Now apply blog post template to article content.
-    template = read_complete_file(template_path)
-
     # Insert link to previous article in nav bar template.
     nav_bar = _NAV_BAR_TEMPLATE.format(previous_article=previous_article_link)
     if not article.previous:
         # No previous articles exist, so remove the `Previous` link from navigation bar.
         nav_bar = nav_bar.replace('<a href="">Previous</a>', '')
 
+    article.nav_bar = nav_bar
+
     # Create text for describing when this article was last updated.
-    last_updated = 'Last updated: ' + datetime.date.today().strftime('%B %d, %Y')
-    current_year = datetime.date.today().strftime('%Y')
+    article.last_updated = 'Last updated: ' + datetime.date.today().strftime('%B %d, %Y')
+    article.current_year = datetime.date.today().strftime('%Y')
+    article.description = extract_meta_description(article)
+    article.first_image = extract_first_image_url(article)
+
+
+def generate_html(article, template_path=TEMPLATE_PATH):
+    """
+    Apply blog post template to Markdown-to-HTML translation.
+
+    Args
+      article: An instance of file_tools.Article.
+      template_path: Path to blog post template file. (Optional)
+
+    Return
+      Final blog post HTML string.
+
+    """
+
     configuration = get_configuration()
-    description = extract_meta_description(article)
-    first_image = extract_first_image_url(article)
-    html = template.format(nav_bar=nav_bar,
-                           article_title=article_title,
-                           article_content=article_content_html,
-                           last_updated=last_updated,
-                           current_year=current_year,
+    if not article.nav_bar:
+        parse_article(article)
+
+    # Now apply blog post template to article content.
+    template = read_complete_file(template_path)
+    html = template.format(nav_bar=article.nav_bar,
+                           article_title=article.title,
+                           article_content=article.content,
+                           last_updated=article.last_updated,
+                           current_year=article.current_year,
                            blog_title=configuration.blog_title,
                            blog_subtitle=configuration.blog_subtitle,
                            owner=configuration.owner,
@@ -372,9 +387,9 @@ def generate_html(article, template_path=TEMPLATE_PATH):
                            style_sheet=configuration.style_sheet,
                            root_url=configuration.root_url,
                            home_page_link='../',
-                           description=description,
+                           description=article.description,
                            article_url=article.url,
-                           article_image=first_image)
+                           article_image=article.first_image)
 
     return html
 

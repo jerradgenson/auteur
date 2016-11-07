@@ -351,6 +351,14 @@ class Article:
         else:
             self.__amp_write_path = None
 
+        self.nav_bar = None
+        self.content = None
+        self.last_updated = None
+        self.current_year = None
+        self.description = None
+        self.first_image = None
+        self.title_html = None
+
     def write(self, amp=False):
         """
         Write AMP and HTML articles (as applicable) to filesystem.

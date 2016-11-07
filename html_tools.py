@@ -16,7 +16,7 @@ from pathlib import Path
 # First-party modules
 import file_tools
 from file_tools import read_complete_file, get_configuration, Article
-from data import TEMPLATE_PATH
+from data import HTML_TEMPLATE_PATH
 
 
 # String index that article title starts on (excluding HTML tags).
@@ -202,7 +202,7 @@ def generate_preview_html(article_preview):
     return preview_html
 
 
-def generate_html_homepage(template_path=TEMPLATE_PATH):
+def generate_html_homepage(template_path=HTML_TEMPLATE_PATH):
     """
     Generate a vanilla HTML homepage that lists a preview of all blog articles
     in reverse chronological order.
@@ -355,7 +355,7 @@ def parse_article(article):
     article.first_image = extract_first_image_url(article)
 
 
-def generate_html(article, template_path=TEMPLATE_PATH):
+def generate_html(article, template_path=HTML_TEMPLATE_PATH):
     """
     Apply blog post template to Markdown-to-HTML translation.
 

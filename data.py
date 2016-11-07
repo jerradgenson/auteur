@@ -25,7 +25,10 @@ RSS_TEMPLATE = Path('.auteur/rss_template.xml')
 RSS_ITEM_TEMPLATE = Path('.auteur/rss_item_template.xml')
 
 # Location of the default blog post HTML template.
-TEMPLATE_PATH = Path('.auteur/template.html')
+HTML_TEMPLATE_PATH = Path('.auteur/html_template.html')
+
+# Location of the default blog post AMP template.
+AMP_TEMPLATE_PATH = Path('.auteur/amp_template.html')
 
 # Relative path to the home page.
 HOMEPAGE_LINK = '../index.html'

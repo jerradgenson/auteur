@@ -48,6 +48,7 @@ _CONFIGURATION_FILE_FIELDS = {'rss_feed_path': Path,
                               'owner': str,
                               'email_address': str,
                               'style_sheet': str,
+                              'style_sheet_path': Path,
                               'description': str,
                               'generate_amp': bool,
                               'generate_vanilla_html': bool}
@@ -243,6 +244,9 @@ def _create_get_configuration():
                     config_values[field_name] = type_func(config_dict[field_name])
 
                 except KeyError:
+                    if field_name == 'style_sheet_path':
+                        continue
+
                     msg = "'{}' field is missing from configuration file.".format(field_name)
                     raise KeyError(msg)
 
@@ -257,6 +261,7 @@ def _create_get_configuration():
             if config_values['style_sheet'][0] == '/':
                 config_values['style_sheet'] = config_values['style_sheet'][1:]
 
+            config_values['style_sheet_path'] = Path(config_values['style_sheet'])
             config_values['style_sheet'] = config_values['root_url'] + config_values['style_sheet']
             configuration = Configuration(program_name=PROGRAM_NAME, **config_values)
 

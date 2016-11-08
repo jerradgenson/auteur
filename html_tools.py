@@ -16,7 +16,7 @@ from pathlib import Path
 # First-party modules
 import file_tools
 from file_tools import read_complete_file, get_configuration, Article
-from data import HTML_TEMPLATE_PATH
+from data import HTML_TEMPLATE_PATH, AMP_TEMPLATE_PATH
 
 
 # String index that article title starts on (excluding HTML tags).
@@ -394,13 +394,53 @@ def generate_html(article, template_path=HTML_TEMPLATE_PATH):
     return html
 
 
-def generate_amp(article):
+def generate_amp(article, template_path=AMP_TEMPLATE_PATH):
     """
     Generate AMP code for the target article.
     """
 
-    # TODO: Generate AMP code instead of merely copying vanilla HTML.
-    return article.html if article.html else generate_html(article)
+    configuration = get_configuration()
+    if not article.nav_bar:
+        parse_article(article)
+
+    # If a vanilla HTML version exists, the canonical link should point to that.
+    # Otherwise, the AMP article should link to itself.
+    canonical_link = article.html_path if configuration.generate_vanilla_html else article.amp_path
+
+    # Read in style sheet to embed in HTML page per the AMP specification.
+    with configuration.style_sheet_path.open() as style_sheet_file:
+        style_sheet = style_sheet_file.read()
+
+    # Replace <img> tags with <amp-img> </amp-img> tags.
+    matches = re.findall('<img.*?>', article.content)
+    amp_content = article.content
+    for match in matches:
+        new_text = match.replace('<img', '<amp-img') + '</amp-img>'
+        amp_content = amp_content.replace(match, new_text)
+
+    # Now apply blog post template to article content.
+    template = read_complete_file(template_path)
+    html = template.format(nav_bar=article.nav_bar,
+                           article_title=article.title,
+                           article_content=amp_content,
+                           last_updated=article.last_updated,
+                           current_year=article.current_year,
+                           blog_title=configuration.blog_title,
+                           blog_subtitle=configuration.blog_subtitle,
+                           owner=configuration.owner,
+                           email_address=configuration.email_address,
+                           rss_feed_path=configuration.rss_feed_path,
+                           style_sheet=style_sheet,
+                           root_url=configuration.root_url,
+                           home_page_link='../',
+                           description=article.description,
+                           article_url=article.url,
+                           article_image=article.first_image,
+                           canonical_link=canonical_link,
+                           schema_type="BlogPosting",
+                           date_published=article.pub_date.strftime('%Y-%m-%d'))
+
+    return html
 
 
 def create_article_previews():

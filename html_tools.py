@@ -372,6 +372,8 @@ def generate_html(article, template_path=HTML_TEMPLATE_PATH):
     if not article.nav_bar:
         parse_article(article)
 
+    rss_url = construct_rss_url(configuration.root_url, configuration.rss_feed_path)
+
     # Now apply blog post template to article content.
     template = read_complete_file(template_path)
     html = template.format(nav_bar=article.nav_bar,
@@ -383,7 +385,7 @@ def generate_html(article, template_path=HTML_TEMPLATE_PATH):
                            blog_subtitle=configuration.blog_subtitle,
                            owner=configuration.owner,
                            email_address=configuration.email_address,
-                           rss_feed_path=configuration.rss_feed_path,
+                           rss_feed_path=rss_url,
                            style_sheet=configuration.style_sheet,
                            root_url=configuration.root_url,
                            home_page_link='../',
@@ -429,7 +431,7 @@ def generate_amp(article, template_path=AMP_TEMPLATE_PATH):
                            blog_subtitle=configuration.blog_subtitle,
                            owner=configuration.owner,
                            email_address=configuration.email_address,
-                           rss_feed_path=configuration.rss_feed_path,
+                           rss_feed_path=construct_rss_url(configuration.root_url, configuration.rss_feed_path),
                            style_sheet=style_sheet,
                            root_url=configuration.root_url,
                            home_page_link='../',
@@ -441,6 +443,25 @@ def generate_amp(article, template_path=AMP_TEMPLATE_PATH):
                            date_published=article.pub_date.strftime('%Y-%m-%d'))
 
     return html
+
+
+def construct_rss_url(root_url, rss_feed_path):
+    """
+    Construct URL for the RSS feed.
+
+    Args
+      root_url: Blog's root URL.
+      rss_feed_path: String or Path object describing the path to the RSS feed
+                     under the blog's root directory.
+
+    Returns
+      The RSS feed URL as a string.
+
+    """
+
+    sep = '' if root_url[-1] == '/' else '/'
+    rss_url = root_url + sep + str(rss_feed_path)
+    return rss_url
 
 
 def create_article_previews():

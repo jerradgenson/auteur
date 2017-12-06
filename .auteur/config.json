@@ -5,7 +5,7 @@
     "blog_subtitle": " ",
     "owner": " ",
     "email_address": " ",
-    "style_sheet": " ",
+    "style_sheet": "resources/style.css",
     "description": " ",
     "generate_amp": false,
     "generate_vanilla_html": true

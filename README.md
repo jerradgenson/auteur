@@ -2,7 +2,7 @@
 
 Auteur is a highly customizable and configurable blog site creator, written for bloggers who desire to create their
 own blog website and "get their hands dirty" with the HTML and CSS, but avoid the costly maintenance required to
-write it by hand.
+write it by hand. You can see a small demo of Auteur in action here: http://www.gensonsoftworks.com/auteur-demo/
 
 Please keep in mind that while Auteur is usable, it is still in the alpha stage of development, so
 some features and niceties are missing, and it hasn't been tested on all platforms. Platforms it has been tested and

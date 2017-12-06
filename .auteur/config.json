@@ -1,5 +1,5 @@
 {
-    "rss_feed_path": " ",
+    "rss_feed_path": "rss.xml",
     "root_url": " ",
     "blog_title": " ",
     "blog_subtitle": " ",
@@ -7,6 +7,6 @@
     "email_address": " ",
     "style_sheet": " ",
     "description": " ",
-    "generate_amp": true,
-    "generate_vanilla_html": true,
+    "generate_amp": false,
+    "generate_vanilla_html": true
 }
